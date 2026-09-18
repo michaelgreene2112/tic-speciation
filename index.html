@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIC Speciation Calculator</title>
+<meta name="description" content="Split a measured total inorganic carbon (TIC) into dissolved CO2, bicarbonate and carbonate from pH, temperature and water matrix. Plummer &amp; Busenberg and Millero constant sets, activity corrections, alkalinity, pCO2 and calcite saturation index.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0F5570" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C141A" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="TIC Speciation Calculator">
+<meta property="og:description" content="Carbonate system speciation from TIC, pH, temperature and water matrix — for water treatment and process engineering.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TIC Speciation">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#E8EDF1; --panel:#FFFFFF; --panel-2:#F3F6F8;
+  --ink:#0F1F2B; --ink-2:#4C5D6A; --ink-3:#7A8B98;
+  --rule:#C7D2DA; --rule-soft:#DFE6EB;
+  --field:#FFFFFF; --field-line:#A8B8C4;
+  --co2:#B2560D; --hco3:#0E6F66; --co3:#573A98;
+  --co2-soft:#F3E2D2; --hco3-soft:#D8EBE8; --co3-soft:#E2DCF2;
+  --accent:#0F5570; --warn:#8C2F12; --ok:#1B6144;
+  --shadow:0 1px 2px rgba(15,31,43,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C141A; --panel:#141F27; --panel-2:#101A21;
+    --ink:#E3EDF3; --ink-2:#9BAEBB; --ink-3:#71808C;
+    --rule:#283945; --rule-soft:#1E2C36;
+    --field:#0D161C; --field-line:#3A4D5A;
+    --co2:#E8934A; --hco3:#3FBCAD; --co3:#A791E4;
+    --co2-soft:#3A2717; --hco3-soft:#12332F; --co3-soft:#241D3D;
+    --accent:#6FBDD9; --warn:#E08B6B; --ok:#5FC49E;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C141A; --panel:#141F27; --panel-2:#101A21;
+  --ink:#E3EDF3; --ink-2:#9BAEBB; --ink-3:#71808C;
+  --rule:#283945; --rule-soft:#1E2C36;
+  --field:#0D161C; --field-line:#3A4D5A;
+  --co2:#E8934A; --hco3:#3FBCAD; --co3:#A791E4;
+  --co2-soft:#3A2717; --hco3-soft:#12332F; --co3-soft:#241D3D;
+  --accent:#6FBDD9; --warn:#E08B6B; --ok:#5FC49E;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px; margin:0 auto; padding:28px 20px 64px}
+
+/* ---------- masthead ---------- */
+header.top{
+  display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px 28px;
+  padding-bottom:18px; border-bottom:2px solid var(--ink); margin-bottom:24px;
+}
+h1{
+  font-size:clamp(26px,3.6vw,38px); font-weight:700; letter-spacing:-.022em;
+  margin:0; line-height:1.05; max-width:16ch;
+}
+header.top p{
+  margin:0; color:var(--ink-2); font-size:14px; max-width:46ch; line-height:1.45;
+}
+.themebtn{
+  margin-left:auto; background:none; border:1px solid var(--rule); color:var(--ink-2);
+  border-radius:999px; padding:5px 13px; font:inherit; font-size:13px; cursor:pointer;
+}
+.themebtn:hover{border-color:var(--ink-2); color:var(--ink)}
+
+/* ---------- layout ---------- */
+.cols{display:grid; grid-template-columns:352px minmax(0,1fr); gap:24px; align-items:start}
+@media(max-width:920px){.cols{grid-template-columns:1fr}}
+
+.panel{background:var(--panel); border:1px solid var(--rule-soft); border-radius:3px; box-shadow:var(--shadow)}
+.panel + .panel{margin-top:16px}
+.panel > h2{
+  margin:0; padding:12px 16px 11px; font-size:14.5px; font-weight:600; letter-spacing:-.01em;
+  border-bottom:1px solid var(--rule-soft);
+}
+.panel .body{padding:14px 16px 16px}
+
+/* ---------- form ---------- */
+.row{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin-bottom:10px}
+.row:last-child{margin-bottom:0}
+label.lb{display:block; font-size:12.5px; color:var(--ink-2); margin-bottom:3px}
+input[type=number],input[type=text],select{
+  width:100%; background:var(--field); color:var(--ink);
+  border:1px solid var(--field-line); border-radius:2px;
+  padding:7px 9px; font:inherit; font-size:14px;
+  font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;
+}
+select{font-family:'Archivo',sans-serif}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.pair{display:grid; grid-template-columns:1fr 1.15fr; gap:8px; margin-bottom:11px}
+.trio{display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; margin-bottom:11px}
+.seg{display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--field-line); border-radius:2px; overflow:hidden; margin-bottom:11px}
+.seg button{
+  flex:1 1 auto; min-width:64px; background:var(--field); color:var(--ink-2);
+  border:0; border-right:1px solid var(--field-line); padding:7px 6px;
+  font:inherit; font-size:12.5px; cursor:pointer;
+}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--ink); color:var(--panel); font-weight:500}
+.hint{font-size:12px; color:var(--ink-3); line-height:1.4; margin:6px 0 0}
+.ions{display:grid; grid-template-columns:1fr 1fr; gap:7px 10px}
+.ions label.lb{margin-bottom:2px}
+details.adv{margin-top:12px; border-top:1px solid var(--rule-soft); padding-top:10px}
+details.adv summary{cursor:pointer; font-size:12.5px; color:var(--ink-2); list-style:none}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:"▸ "; color:var(--ink-3)}
+details.adv[open] summary::before{content:"▾ "}
+details.adv .body2{padding-top:11px}
+
+/* ---------- hero split ---------- */
+.hero{padding:18px 18px 16px}
+.bar{
+  display:flex; width:100%; height:78px; border-radius:2px; overflow:hidden;
+  border:1px solid var(--rule); background:var(--panel-2);
+}
+.bar > div{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  color:#fff; overflow:hidden; transition:width .18s ease; min-width:0;
+}
+.bar .pct{font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:600; line-height:1.1; white-space:nowrap}
+.bar .nm{font-size:11.5px; opacity:.92; white-space:nowrap; margin-top:1px}
+.bseg0{background:var(--co2)} .bseg1{background:var(--hco3)} .bseg2{background:var(--co3)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .bar > div{color:#0C141A}}
+:root[data-theme=dark] .bar > div{color:#0C141A}
+
+.keyrow{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px}
+@media(max-width:560px){.keyrow{grid-template-columns:1fr}}
+.key{border-left:3px solid var(--rule); padding-left:11px}
+.key.k0{border-color:var(--co2)} .key.k1{border-color:var(--hco3)} .key.k2{border-color:var(--co3)}
+.key .v{font-family:'IBM Plex Mono',monospace; font-size:21px; font-weight:600; letter-spacing:-.02em; line-height:1.15}
+.key .u{font-size:12px; color:var(--ink-2)}
+.key .l{font-size:12.5px; color:var(--ink-2); margin-top:2px}
+
+/* ---------- tables ---------- */
+table{width:100%; border-collapse:collapse; font-size:13.5px}
+th,td{text-align:right; padding:6px 8px; border-bottom:1px solid var(--rule-soft)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:11.5px; font-weight:600; color:var(--ink-2); border-bottom:1px solid var(--rule); padding-bottom:5px}
+tbody td{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums}
+tbody td:first-child{font-family:'Archivo',sans-serif}
+tbody tr:last-child td{border-bottom:0}
+.sw{display:inline-block; width:9px; height:9px; border-radius:1px; margin-right:7px; vertical-align:baseline}
+
+/* Scrollable table with a frozen header row and frozen first column.
+   The species name and the column meanings stay on screen at any scroll offset. */
+.tblwrap{overflow:auto; max-height:70vh; position:relative; -webkit-overflow-scrolling:touch}
+.tblwrap table{min-width:580px}
+.tblwrap thead th{position:sticky; top:0; z-index:3; background:var(--panel)}
+.tblwrap th:first-child,.tblwrap td:first-child{
+  position:sticky; left:0; z-index:2; background:var(--panel);
+  box-shadow:1px 0 0 var(--rule-soft);
+}
+.tblwrap thead th:first-child{z-index:4}
+
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:0 26px}
+@media(max-width:620px){.grid2{grid-template-columns:1fr}}
+.dl{display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--rule-soft); font-size:13.5px}
+.dl:last-child{border-bottom:0}
+.dl dt{color:var(--ink-2); margin:0}
+.dl dd{margin:0; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; text-align:right}
+
+/* ---------- plot ---------- */
+.plotbox{padding:10px 8px 6px}
+svg.bj{display:block; width:100%; height:auto}
+.legend{display:flex; flex-wrap:wrap; gap:14px; padding:2px 10px 12px; font-size:12.5px; color:var(--ink-2)}
+.legend span{display:flex; align-items:center; gap:6px}
+.slider{padding:2px 16px 14px}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%;
+  height:44px; background:transparent; cursor:pointer; margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:6px; border-radius:3px; background:var(--rule)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:28px; height:28px; margin-top:-11px;
+  border-radius:50%; background:var(--accent); border:3px solid var(--panel);
+  box-shadow:0 1px 3px rgba(0,0,0,.28);
+}
+input[type=range]::-moz-range-track{height:6px; border-radius:3px; background:var(--rule)}
+input[type=range]::-moz-range-thumb{
+  width:24px; height:24px; border-radius:50%; background:var(--accent);
+  border:3px solid var(--panel); box-shadow:0 1px 3px rgba(0,0,0,.28);
+}
+
+/* ---------- species cards (phone) ---------- */
+.speccards{display:none}
+.speccard{border-left:3px solid var(--rule); padding:9px 0 10px 12px; margin-bottom:11px}
+.speccard:last-child{margin-bottom:0}
+.speccard.s0{border-color:var(--co2)} .speccard.s1{border-color:var(--hco3)}
+.speccard.s2{border-color:var(--co3)} .speccard.st{border-color:var(--ink)}
+.speccard h3{margin:0 0 7px; font-size:14.5px; font-weight:600}
+.speccard .sp{display:grid; grid-template-columns:auto auto; gap:3px 14px; font-size:13px}
+.speccard .sp dt{color:var(--ink-2); margin:0}
+.speccard .sp dd{margin:0; text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums}
+
+/* ---------- flags ---------- */
+.flags{margin-top:16px}
+.flag{
+  display:flex; gap:9px; padding:9px 12px; font-size:13px; line-height:1.45;
+  border-left:3px solid var(--warn); background:var(--panel); border-top:1px solid var(--rule-soft);
+  border-right:1px solid var(--rule-soft); border-bottom:1px solid var(--rule-soft);
+  margin-bottom:8px; border-radius:0 3px 3px 0;
+}
+.flag.ok{border-left-color:var(--ok)}
+.flag b{font-weight:600}
+
+.actions{display:flex; gap:9px; flex-wrap:wrap; padding:0 16px 16px}
+.btn{
+  background:var(--ink); color:var(--panel); border:0; border-radius:2px;
+  padding:8px 15px; font:inherit; font-size:13px; font-weight:500; cursor:pointer;
+}
+.btn.sec{background:transparent; color:var(--ink-2); border:1px solid var(--rule)}
+.btn.sec:hover{border-color:var(--ink-2); color:var(--ink)}
+
+/* ---------- notes ---------- */
+.notes{margin-top:24px; border-top:1px solid var(--rule); padding-top:4px}
+.notes details{border-bottom:1px solid var(--rule-soft)}
+.notes summary{cursor:pointer; padding:11px 2px; font-size:14px; font-weight:500; list-style:none}
+.notes summary::-webkit-details-marker{display:none}
+.notes summary::before{content:"+ "; color:var(--ink-3); font-family:'IBM Plex Mono',monospace}
+.notes details[open] summary::before{content:"– "}
+.notes .nb{padding:0 2px 16px; font-size:13.5px; color:var(--ink-2); line-height:1.6; max-width:78ch}
+.notes .nb p{margin:0 0 10px}
+.notes .nb ul{margin:0 0 10px; padding-left:18px}
+.notes .nb li{margin-bottom:5px}
+.notes .nb code{font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--panel-2); padding:1px 4px; border-radius:2px; color:var(--ink)}
+.eq{font-family:'IBM Plex Mono',monospace; font-size:12.5px; background:var(--panel); border:1px solid var(--rule-soft); border-radius:2px; padding:9px 11px; margin:0 0 10px; overflow-x:auto; color:var(--ink); white-space:pre}
+/* ---------- phone ---------- */
+@media(max-width:640px){
+  .wrap{padding:20px 14px 52px}
+  header.top{gap:10px 16px; padding-bottom:14px; margin-bottom:18px}
+  header.top p{font-size:13.5px}
+  .themebtn{min-height:40px; padding:8px 15px}
+
+  /* no horizontal scroll needed at all: stacked cards replace the grid */
+  .tblwrap{display:none}
+  .speccards{display:block}
+
+  .panel .body{padding:13px 14px 15px}
+  .hero{padding:15px 14px 14px}
+  .bar{height:66px}
+  .bar .pct{font-size:16px}
+  .bar .nm{font-size:10.5px}
+  .keyrow{grid-template-columns:1fr; gap:10px; margin-top:14px}
+  .key .v{font-size:23px}
+
+  .dl{padding:7px 0; font-size:13.5px}
+  .grid2{grid-template-columns:1fr}
+
+  /* 16px prevents iOS from zooming the viewport on focus */
+  input[type=number],input[type=text],select{font-size:16px; padding:9px 10px}
+  .seg button{min-height:44px; font-size:13px}
+  .btn{min-height:44px; padding:10px 18px; font-size:14px}
+  .actions{gap:10px}
+  details.adv summary,.notes summary{padding:12px 2px; min-height:44px}
+  .legend{font-size:12px; gap:10px 14px}
+}
+@media(max-width:359px){
+  .ions{grid-template-columns:1fr}
+  .pair,.trio{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>TIC speciation</h1>
+  </div>
+  <p>Splits a measured total inorganic carbon into dissolved CO<sub>2</sub>, bicarbonate and carbonate from pH, temperature and water matrix. Built for lab TIC results of the kind a Shimadzu TOC-L/TOC-V reports as IC.</p>
+  <button class="themebtn" id="themebtn" type="button">Theme</button>
+</header>
+
+<div class="cols">
+
+  <!-- ================= INPUTS ================= -->
+  <div>
+    <section class="panel">
+      <h2>Sample</h2>
+      <div class="body">
+        <div class="pair">
+          <div>
+            <label class="lb" for="tic">Total inorganic carbon</label>
+            <input type="number" inputmode="decimal" id="tic" value="120" step="any" min="0">
+          </div>
+          <div>
+            <label class="lb" for="ticUnit">Basis</label>
+            <select id="ticUnit">
+              <option value="mgC">mg C/L</option>
+              <option value="mM">mmol/L</option>
+              <option value="mgCaCO3">mg/L as CaCO₃</option>
+              <option value="mgHCO3">mg/L as HCO₃⁻</option>
+              <option value="mgCO2">mg/L as CO₂</option>
+            </select>
+          </div>
+        </div>
+        <div class="pair">
+          <div>
+            <label class="lb" for="ph">pH</label>
+            <input type="number" inputmode="decimal" id="ph" value="7.80" step="0.01" min="0" max="14">
+          </div>
+          <div>
+            <label class="lb" for="phScale">pH scale</label>
+            <select id="phScale">
+              <option value="nbs">NBS / free (meter)</option>
+              <option value="sws">Seawater scale</option>
+              <option value="total">Total scale</option>
+            </select>
+          </div>
+        </div>
+        <div class="pair">
+          <div>
+            <label class="lb" for="temp">Temperature (°C)</label>
+            <input type="number" inputmode="decimal" id="temp" value="25" step="0.1" min="0" max="90">
+          </div>
+          <div>
+            <label class="lb" for="rho">Density (kg/L)</label>
+            <input type="number" inputmode="decimal" id="rho" value="1.000" step="0.001" min="0.9" max="1.3">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Water matrix</h2>
+      <div class="body">
+        <div class="seg" id="matrixSeg" role="group" aria-label="Matrix input method">
+          <button type="button" data-m="ions" aria-pressed="true">Ion analysis</button>
+          <button type="button" data-m="tds" aria-pressed="false">TDS</button>
+          <button type="button" data-m="ec" aria-pressed="false">Conductivity</button>
+          <button type="button" data-m="sal" aria-pressed="false">Salinity</button>
+        </div>
+
+        <div id="mIons">
+          <div class="ions">
+            <div><label class="lb" for="iNa">Na⁺ mg/L</label><input type="number" inputmode="decimal" id="iNa" value="180" step="any" min="0"></div>
+            <div><label class="lb" for="iK">K⁺ mg/L</label><input type="number" inputmode="decimal" id="iK" value="12" step="any" min="0"></div>
+            <div><label class="lb" for="iCa">Ca²⁺ mg/L</label><input type="number" inputmode="decimal" id="iCa" value="85" step="any" min="0"></div>
+            <div><label class="lb" for="iMg">Mg²⁺ mg/L</label><input type="number" inputmode="decimal" id="iMg" value="26" step="any" min="0"></div>
+            <div><label class="lb" for="iNH4">NH₄⁺ mg/L</label><input type="number" inputmode="decimal" id="iNH4" value="0" step="any" min="0"></div>
+            <div><label class="lb" for="iCl">Cl⁻ mg/L</label><input type="number" inputmode="decimal" id="iCl" value="240" step="any" min="0"></div>
+            <div><label class="lb" for="iSO4">SO₄²⁻ mg/L</label><input type="number" inputmode="decimal" id="iSO4" value="110" step="any" min="0"></div>
+            <div><label class="lb" for="iNO3">NO₃⁻ mg/L</label><input type="number" inputmode="decimal" id="iNO3" value="0" step="any" min="0"></div>
+          </div>
+          <p class="hint">Carbonate species are added to ionic strength and charge balance automatically, by iteration.</p>
+        </div>
+
+        <div id="mTds" hidden>
+          <label class="lb" for="tds">Total dissolved solids (mg/L)</label>
+          <input type="number" inputmode="decimal" id="tds" value="850" step="any" min="0">
+          <p class="hint">I ≈ 2.5 × 10⁻⁵ × TDS. Ca is taken from the ion panel for scaling indices.</p>
+        </div>
+
+        <div id="mEc" hidden>
+          <label class="lb" for="ec">Conductivity (µS/cm at 25 °C)</label>
+          <input type="number" inputmode="decimal" id="ec" value="1330" step="any" min="0">
+          <p class="hint">I ≈ 1.6 × 10⁻⁵ × EC (Langelier). Rough for brines and for waters dominated by divalents.</p>
+        </div>
+
+        <div id="mSal" hidden>
+          <label class="lb" for="sal">Practical salinity (g/kg)</label>
+          <input type="number" inputmode="decimal" id="sal" value="35" step="any" min="0" max="120">
+          <p class="hint">I = 19.924 S / (1000 − 1.005 S), mol/kg. Use with the saline model.</p>
+        </div>
+
+        <details class="adv">
+          <summary>Activity and model options</summary>
+          <div class="body2">
+            <label class="lb" for="model">Equilibrium constants</label>
+            <select id="model" style="margin-bottom:11px">
+              <option value="A">Thermodynamic + activity correction (Plummer &amp; Busenberg)</option>
+              <option value="B">Saline stoichiometric (Millero, seawater-type)</option>
+            </select>
+            <label class="lb" for="gmodel">Activity coefficient model</label>
+            <select id="gmodel" style="margin-bottom:11px">
+              <option value="davies">Davies</option>
+              <option value="tj">Extended Debye–Hückel (Truesdell–Jones)</option>
+              <option value="dh">Debye–Hückel limiting law</option>
+            </select>
+            <label class="lb" for="ks">Setchenow constant for CO₂(aq), k<sub>s</sub> (L/mol)</label>
+            <input type="number" inputmode="decimal" id="ks" value="0.11" step="0.01" min="0" max="0.4">
+            <p class="hint">Salting-out of neutral CO₂: log γ<sub>CO₂</sub> = k<sub>s</sub> I. 0.10–0.12 for NaCl-dominated water.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= RESULTS ================= -->
+  <div>
+    <section class="panel">
+      <h2>Speciation at the sample pH</h2>
+      <div class="hero">
+        <div class="bar" id="bar">
+          <div class="bseg0" id="b0" style="width:33%"><span class="pct">–</span><span class="nm">CO₂(aq)</span></div>
+          <div class="bseg1" id="b1" style="width:34%"><span class="pct">–</span><span class="nm">HCO₃⁻</span></div>
+          <div class="bseg2" id="b2" style="width:33%"><span class="pct">–</span><span class="nm">CO₃²⁻</span></div>
+        </div>
+        <div class="keyrow">
+          <div class="key k0"><div class="v" id="kv0">–</div><div class="u">mg/L as CO₂</div><div class="l">Free CO₂ — strippable, drives corrosivity</div></div>
+          <div class="key k1"><div class="v" id="kv1">–</div><div class="u">mg/L as HCO₃⁻</div><div class="l">Bicarbonate — bulk of alkalinity</div></div>
+          <div class="key k2"><div class="v" id="kv2">–</div><div class="u">mg/L as CO₃²⁻</div><div class="l">Carbonate — CaCO₃ scaling driver</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Species detail</h2>
+      <div class="body">
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Species</th><th>Fraction</th><th>mol/L</th><th>mmol/L</th><th>mg/L as species</th><th>mg C/L</th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="speccards" id="cards"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Speciation across pH</h2>
+      <div class="plotbox"><div id="plot"></div></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--co2)"></i>CO₂(aq) + H₂CO₃</span>
+        <span><i class="sw" style="background:var(--hco3)"></i>HCO₃⁻</span>
+        <span><i class="sw" style="background:var(--co3)"></i>CO₃²⁻</span>
+        <span style="color:var(--ink-3)">Vertical line = sample pH</span>
+      </div>
+      <div class="slider">
+        <label class="lb" for="phSlide">Drag to explore pH (updates the sample pH)</label>
+        <input type="range" id="phSlide" min="3" max="12" step="0.01" value="7.80">
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Derived quantities</h2>
+      <div class="body">
+        <div class="grid2">
+          <div>
+            <div class="dl"><dt>Carbonate alkalinity</dt><dd id="d_alk">–</dd></div>
+            <div class="dl"><dt>Carbonate alk. as CaCO₃</dt><dd id="d_alkc">–</dd></div>
+            <div class="dl"><dt>Total alkalinity (carbonate + water)</dt><dd id="d_talk">–</dd></div>
+            <div class="dl"><dt>Equilibrium pCO₂</dt><dd id="d_pco2">–</dd></div>
+            <div class="dl"><dt>pCO₂ vs. air (≈430 ppm)</dt><dd id="d_pco2r">–</dd></div>
+            <div class="dl"><dt>Free CO₂ / TIC</dt><dd id="d_fco2">–</dd></div>
+          </div>
+          <div>
+            <div class="dl"><dt>Ionic strength</dt><dd id="d_I">–</dd></div>
+            <div class="dl"><dt>γ CO₂(aq) · γ HCO₃⁻ · γ CO₃²⁻</dt><dd id="d_g">–</dd></div>
+            <div class="dl"><dt>pK₁′ · pK₂′ (conditional)</dt><dd id="d_pk">–</dd></div>
+            <div class="dl"><dt>pK<sub>w</sub> · pK<sub>H</sub></dt><dd id="d_pkw">–</dd></div>
+            <div class="dl"><dt>Calcite saturation index</dt><dd id="d_sic">–</dd></div>
+            <div class="dl"><dt>Aragonite SI · LSI</dt><dd id="d_sia">–</dd></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="copyBtn" type="button">Copy results</button>
+        <button class="btn sec" id="resetBtn" type="button">Reset inputs</button>
+      </div>
+    </section>
+
+    <div class="flags" id="flags"></div>
+  </div>
+</div>
+
+<!-- ================= NOTES ================= -->
+<div class="notes">
+  <details>
+    <summary>Equations and constants</summary>
+    <div class="nb">
+      <p>The carbonate system is two equilibria over one conserved total:</p>
+      <div class="eq">CO₂(aq) + H₂O ⇌ H⁺ + HCO₃⁻      K₁ = {H⁺}{HCO₃⁻} / {CO₂}
+HCO₃⁻        ⇌ H⁺ + CO₃²⁻      K₂ = {H⁺}{CO₃²⁻} / {HCO₃⁻}
+C_T = [CO₂*] + [HCO₃⁻] + [CO₃²⁻]</div>
+      <p>With <code>h = 10^(−pH)</code> and conditional constants K₁′, K₂′ the fractions are closed-form, so no iteration on pH is needed:</p>
+      <div class="eq">α₀ = 1 / (1 + K₁′/h + K₁′K₂′/h²)        → CO₂(aq)
+α₁ = 1 / (h/K₁′ + 1 + K₂′/h)          → HCO₃⁻
+α₂ = 1 / (h²/(K₁′K₂′) + h/K₂′ + 1)     → CO₃²⁻</div>
+      <p><b>Model A — thermodynamic constants plus activity corrections.</b> K₁, K₂, K<sub>H</sub>, K<sub>w</sub> and K<sub>sp</sub> follow Plummer &amp; Busenberg (1982), valid 0–90 °C. Because a glass electrode reads hydrogen ion <em>activity</em>, the constants are made conditional on concentration through the activity coefficients:</p>
+      <div class="eq">K₁′ = K₁ · γ(CO₂) / γ(HCO₃⁻)
+K₂′ = K₂ · γ(HCO₃⁻) / γ(CO₃²⁻)</div>
+      <p>γ for charged species comes from Davies, extended Debye–Hückel (Truesdell–Jones, WATEQ parameters) or the limiting law. Neutral CO₂ is salted out by the Setchenow relation <code>log γ = k_s·I</code>. Debye–Hückel A and B are computed at the sample temperature from the dielectric constant of water.</p>
+      <p><b>Model B — saline stoichiometric constants.</b> pK₁* and pK₂* from Millero's fits to potentiometric seawater data, of the form <code>pKᵢ* = pKᵢ⁰ + Aᵢ + Bᵢ/T + Cᵢ·ln T</code> with A, B, C polynomials in √S. These are concentration constants on the seawater pH scale, so no activity coefficients are applied — the ionic interactions are already inside the fitted constant. Check values at S = 35, 25 °C: pK₁* = 5.840, pK₂* = 8.964. K₀ from Weiss (1974); K*sp for calcite and aragonite from Mucci (1983).</p>
+      <p>Saturation index is <code>SI = log₁₀(IAP/K_sp)</code> with IAP = {Ca²⁺}{CO₃²⁻} in model A and [Ca²⁺][CO₃²⁻] in model B. LSI is reported as <code>pH − pH_s</code> for the same system. SI &gt; 0 means calcium carbonate is thermodynamically favoured to precipitate; it says nothing about kinetics or induction time.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Reading a Shimadzu IC result into this tool</summary>
+    <div class="nb">
+      <p>On a Shimadzu TOC-L or TOC-V, <span>the IC channel acidifies the sample with phosphoric acid and sparges it, converting every inorganic carbon species to CO₂ for NDIR detection</span>. Some configurations use HCl to reach pH &lt; 3 instead. Either way the measurement is a <em>total</em>: dissolved CO₂, bicarbonate and carbonate all report as one number in mg C/L. That number is exactly the C_T this calculator splits, so enter it with the <b>mg C/L</b> basis and no conversion.</p>
+      <ul>
+        <li><b>Calibration basis.</b> The IC channel is normally calibrated with sodium bicarbonate, which is a carbon standard — the reported value is carbon mass, not HCO₃⁻ mass. Using the mg/L as HCO₃⁻ basis here would understate C_T by a factor of about five.</li>
+        <li><b>Sampling is the dominant error, not the instrument.</b> The split depends on the pH the water had <em>in situ</em>. Sample with no headspace, keep it cold, measure pH and temperature at the same moment as the sample is drawn, and analyse quickly. A degassed or air-equilibrated sample loses free CO₂, which lowers C_T and raises pH, and the tool will then report a carbonate-shifted split that the process never had.</li>
+        <li><b>pH measured at a different temperature than the process.</b> Enter the process temperature and the pH as read; then re-run at the measurement temperature to see the sensitivity. Below about pH 8 the split is not very temperature sensitive; above it, pK₂ moves the CO₃²⁻ fraction noticeably.</li>
+        <li><b>High-salt samples.</b> The high-salt combustion kit and the salt-tolerance of the IC channel affect the TC side far more than IC. For brines the larger correction is chemical, not analytical — use the saline model or at least a realistic ionic strength.</li>
+        <li><b>Cross-check.</b> If you also have a titrated alkalinity, compare it with the carbonate alkalinity reported here. Agreement within a few percent means pH, TIC and temperature are mutually consistent. A large gap usually means non-carbonate alkalinity (ammonia, borate, organic acids, silicate) or a degassed sample.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Validity limits and what this tool does not do</summary>
+    <div class="nb">
+      <ul>
+        <li>Davies is dependable to about I = 0.5 mol/L and degrades beyond it. Past roughly I = 0.7 the honest options are the saline model, if the ionic ratios are broadly seawater-like, or a Pitzer-based code such as PHREEQC with the pitzer database. This page warns but does not stop you.</li>
+        <li>The saline model is fitted for S = 0–50 and 0–50 °C in seawater-proportion matrices. A sodium chloride brine or an RO concentrate at the same salinity is not the same matrix, and extrapolating it is a judgement call.</li>
+        <li>Mixing pH scales is the commonest silent error. A meter calibrated with NBS buffers in a saline sample is not on the seawater scale. The offset is approximately 0.10–0.15 pH units at seawater salinity and it propagates directly into the CO₂ and CO₃²⁻ fractions.</li>
+        <li>No ion pairing is modelled. In hard or high-sulfate waters a real fraction of carbonate exists as CaCO₃⁰, CaHCO₃⁺, MgCO₃⁰ and NaCO₃⁻, so free CO₃²⁻ is lower than reported and calcite SI is correspondingly optimistic.</li>
+        <li>Alkalinity here is the carbonate and water contribution only. Ammonia, borate, silicate, phosphate, sulfide and organic acids are not included.</li>
+        <li>Pressure is atmospheric. No correction for depth or for pressurised membrane feed channels.</li>
+      </ul>
+      <p>References: Plummer &amp; Busenberg (1982) <em>Geochim. Cosmochim. Acta</em> 46, 1011; Millero et al. (2006) <em>Mar. Chem.</em> 100, 80 and Millero (2010) <em>Mar. Freshwater Res.</em> 61, 139; Weiss (1974) <em>Mar. Chem.</em> 2, 203; Mucci (1983) <em>Am. J. Sci.</em> 283, 780; Stumm &amp; Morgan, <em>Aquatic Chemistry</em>, 3rd ed.</p>
+    </div>
+  </details>
+</div>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- constants ---------------- */
+var MW = {C:12.011, CO2:44.009, HCO3:61.017, CO3:60.009, CaCO3:100.087,
+          Na:22.990, K:39.098, Ca:40.078, Mg:24.305, NH4:18.039,
+          Cl:35.453, SO4:96.06, NO3:62.004};
+/* Truesdell-Jones / WATEQ ion-size and b parameters */
+var TJ = {H:[9.0,0], HCO3:[5.4,0], CO3:[5.4,0], Ca:[5.0,0.165], OH:[3.5,0]};
+
+var $ = function(id){return document.getElementById(id);};
+var state = {matrix:"ions"};
+
+/* ---------------- thermodynamic constants ---------------- */
+function pbConstants(T){
+  var lg = Math.log(T)/Math.LN10, T2 = T*T;
+  return {
+    K1  : Math.pow(10, -356.3094 - 0.06091964*T + 21834.37/T + 126.8339*lg - 1684915/T2),
+    K2  : Math.pow(10, -107.8871 - 0.03252849*T + 5151.79/T  + 38.92561*lg - 563713.9/T2),
+    KH  : Math.pow(10,  108.3865 + 0.01985076*T - 6919.53/T  - 40.45154*lg + 669365/T2),
+    Kw  : Math.pow(10, -283.971  - 0.05069842*T + 13323/T    + 102.24447*lg - 1119669/T2),
+    Kcal: Math.pow(10, -171.9065 - 0.077993*T   + 2839.319/T + 71.595*lg),
+    Kara: Math.pow(10, -171.9773 - 0.077993*T   + 2903.293/T + 71.595*lg)
+  };
+}
+
+function milleroConstants(T,S){
+  var lnT = Math.log(T), lg = lnT/Math.LN10, sS = Math.sqrt(Math.max(S,0));
+  var pK10 = -126.34048 + 6320.813/T + 19.568224*lnT;
+  var pK20 =  -90.18333 + 5143.692/T + 14.613358*lnT;
+  var A1 = 13.4191*sS + 0.0331*S - 5.33e-5*S*S,
+      B1 = -530.123*sS - 6.103*S,
+      C1 = -2.06950*sS;
+  var A2 = 21.0894*sS + 0.1248*S - 3.687e-4*S*S,
+      B2 = -772.483*sS - 20.051*S,
+      C2 = -3.3336*sS;
+  var pK1 = pK10 + A1 + B1/T + C1*lnT;
+  var pK2 = pK20 + A2 + B2/T + C2*lnT;
+  var t100 = T/100;
+  var lnK0 = 93.4517/t100 - 60.2409 + 23.3585*Math.log(t100)
+           + S*(0.023517 - 0.023656*t100 + 0.0047036*t100*t100);
+  var lnKw = 148.9802 - 13847.26/T - 23.6521*lnT
+           + (-5.977 + 118.67/T + 1.0495*lnT)*sS - 0.01615*S;
+  var base = -171.9065 - 0.077993*T + 2839.319/T + 71.595*lg;
+  var baseA = -171.945 - 0.077993*T + 2903.293/T + 71.595*lg;
+  return {
+    K1: Math.pow(10,-pK1), K2: Math.pow(10,-pK2),
+    KH: Math.exp(lnK0), Kw: Math.exp(lnKw),
+    Kcal: Math.pow(10, base + (-0.77712 + 0.0028426*T + 178.34/T)*sS - 0.07711*S + 0.0041249*S*sS),
+    Kara: Math.pow(10, baseA + (-0.068393 + 0.0017276*T + 88.135/T)*sS - 0.10018*S + 0.0059415*S*sS)
+  };
+}
+
+/* ---------------- activity coefficients ---------------- */
+function debyeParams(tC){
+  var T = tC + 273.15;
+  var eps = 87.74 - 0.4008*tC + 9.398e-4*tC*tC - 1.410e-6*tC*tC*tC;
+  return {A: 1.82483e6*Math.pow(eps*T,-1.5), B: 0.50292*Math.pow(eps*T,-0.5)*100};
+}
+function gamma(z, I, dp, model, ion){
+  if(I <= 0) return 1;
+  var sI = Math.sqrt(I), z2 = z*z;
+  var lg;
+  if(model === "dh"){
+    lg = -dp.A*z2*sI;
+  } else if(model === "tj" && TJ[ion]){
+    lg = -dp.A*z2*sI/(1 + dp.B*TJ[ion][0]*sI) + TJ[ion][1]*I;
+  } else {
+    lg = -dp.A*z2*(sI/(1+sI) - 0.3*I);
+  }
+  return Math.pow(10, lg);
+}
+
+/* ---------------- read inputs ---------------- */
+function num(id, dflt){
+  var v = parseFloat($(id).value);
+  return isFinite(v) ? v : (dflt || 0);
+}
+
+function readIons(){
+  return {Na:num("iNa"), K:num("iK"), Ca:num("iCa"), Mg:num("iMg"), NH4:num("iNH4"),
+          Cl:num("iCl"), SO4:num("iSO4"), NO3:num("iNO3")};
+}
+
+function ticToMolar(){
+  var v = num("tic"), u = $("ticUnit").value;
+  switch(u){
+    case "mM":       return v/1000;
+    case "mgCaCO3":  return v/MW.CaCO3/1000;
+    case "mgHCO3":   return v/MW.HCO3/1000;
+    case "mgCO2":    return v/MW.CO2/1000;
+    default:         return v/MW.C/1000;   // mg C/L
+  }
+}
+
+/* ---------------- core calculation ---------------- */
+function compute(phOverride){
+  var out = {flags:[]};
+  var tC = num("temp",25), T = tC + 273.15;
+  var pH = (phOverride === undefined) ? num("ph",7) : phOverride;
+  var CT = ticToMolar();
+  var rho = num("rho",1) || 1;
+  var model = $("model").value;
+  var gmodel = $("gmodel").value;
+  var ks = num("ks",0.11);
+  var ions = readIons();
+  var mat = state.matrix;
+
+  /* --- ionic strength and salinity --- */
+  var I, S, tds;
+  var ionMol = {};
+  if(mat === "ions"){
+    ionMol = {Na:ions.Na/MW.Na/1000, K:ions.K/MW.K/1000, Ca:ions.Ca/MW.Ca/1000,
+              Mg:ions.Mg/MW.Mg/1000, NH4:ions.NH4/MW.NH4/1000, Cl:ions.Cl/MW.Cl/1000,
+              SO4:ions.SO4/MW.SO4/1000, NO3:ions.NO3/MW.NO3/1000};
+    I = 0.5*(ionMol.Na + ionMol.K + 4*ionMol.Ca + 4*ionMol.Mg + ionMol.NH4
+           + ionMol.Cl + 4*ionMol.SO4 + ionMol.NO3);
+    tds = ions.Na+ions.K+ions.Ca+ions.Mg+ions.NH4+ions.Cl+ions.SO4+ions.NO3;
+    S = tds/1000;
+  } else if(mat === "tds"){
+    tds = num("tds"); I = 2.5e-5*tds; S = tds/1000;
+  } else if(mat === "ec"){
+    var ec = num("ec"); I = 1.6e-5*ec; tds = 0.64*ec; S = tds/1000;
+  } else {
+    S = num("sal",35); I = 19.924*S/(1000 - 1.005*S); tds = S*1000;
+  }
+  var Ibase = I;
+
+  /* --- speciation, iterated so carbonate feeds back into I --- */
+  var K, dp = debyeParams(tC);
+  var a0=0,a1=0,a2=0, gCO2=1,gHCO3=1,gCO3=1,gCa=1, K1c, K2c;
+  var h = Math.pow(10,-pH);
+
+  for(var it=0; it<12; it++){
+    if(model === "A"){
+      K = pbConstants(T);
+      gHCO3 = gamma(1,I,dp,gmodel,"HCO3");
+      gCO3  = gamma(2,I,dp,gmodel,"CO3");
+      gCa   = gamma(2,I,dp,gmodel,"Ca");
+      gCO2  = Math.pow(10, ks*I);
+      K1c = K.K1*gCO2/gHCO3;
+      K2c = K.K2*gHCO3/gCO3;
+    } else {
+      K = milleroConstants(T,S);
+      gHCO3 = gCO3 = gCa = gCO2 = 1;
+      K1c = K.K1; K2c = K.K2;
+    }
+    var d = 1 + K1c/h + K1c*K2c/(h*h);
+    a0 = 1/d; a1 = (K1c/h)/d; a2 = (K1c*K2c/(h*h))/d;
+    var Inew = Ibase + 0.5*(CT*a1 + 4*CT*a2);
+    if(mat !== "ions" || Math.abs(Inew - I) < 1e-9){ I = Inew; break; }
+    I = Inew;
+  }
+
+  var cCO2 = CT*a0, cHCO3 = CT*a1, cCO3 = CT*a2;
+  var Kw = K.Kw;
+  var cOH = (model === "A") ? Kw/(h*gamma(1,I,dp,gmodel,"OH")) : Kw/h;
+  var cH  = (model === "A") ? h/gamma(1,I,dp,gmodel,"H") : h;
+
+  /* --- derived --- */
+  var alk = cHCO3 + 2*cCO3;                      // eq/L, carbonate only
+  var talk = alk + cOH - cH;
+  var pCO2 = cCO2/(rho)/K.KH;                    // atm  (KH in mol/(kg·atm))
+  var Ca = ions.Ca/MW.Ca/1000;
+  var IAP = (model === "A") ? (gCa*Ca)*(gCO3*cCO3) : (Ca/rho)*(cCO3/rho);
+  var SIc = (Ca>0 && cCO3>0) ? Math.log(IAP/K.Kcal)/Math.LN10 : null;
+  var SIa = (Ca>0 && cCO3>0) ? Math.log(IAP/K.Kara)/Math.LN10 : null;
+  var LSI = SIc;   // pH - pHs is identical to SI for the same constant set
+
+  /* --- charge balance --- */
+  var cbe = null;
+  if(mat === "ions"){
+    var cat = ionMol.Na + ionMol.K + 2*ionMol.Ca + 2*ionMol.Mg + ionMol.NH4 + cH;
+    var an  = ionMol.Cl + 2*ionMol.SO4 + ionMol.NO3 + cHCO3 + 2*cCO3 + cOH;
+    if(cat + an > 0) cbe = 100*(cat - an)/(cat + an);
+  }
+
+  return {tC:tC,T:T,pH:pH,CT:CT,I:I,S:S,tds:tds,model:model,
+          a0:a0,a1:a1,a2:a2,cCO2:cCO2,cHCO3:cHCO3,cCO3:cCO3,
+          gCO2:gCO2,gHCO3:gHCO3,gCO3:gCO3,K1c:K1c,K2c:K2c,K:K,
+          cOH:cOH,cH:cH,alk:alk,talk:talk,pCO2:pCO2,
+          SIc:SIc,SIa:SIa,LSI:LSI,cbe:cbe,Ca:Ca,rho:rho,gmodel:gmodel};
+}
+
+/* fractions only — used by the plot */
+function fractions(pH,r){
+  var h = Math.pow(10,-pH);
+  var d = 1 + r.K1c/h + r.K1c*r.K2c/(h*h);
+  return [1/d, (r.K1c/h)/d, (r.K1c*r.K2c/(h*h))/d];
+}
+
+/* ---------------- formatting ---------------- */
+function sig(x,n){
+  if(x === null || !isFinite(x)) return "–";
+  if(x === 0) return "0";
+  var ax = Math.abs(x);
+  if(ax >= 1e5 || ax < 1e-4) return x.toExponential(n-1).replace("e","×10^").replace("+","");
+  var digits = Math.max(0, n - 1 - Math.floor(Math.log(ax)/Math.LN10));
+  return x.toFixed(Math.min(digits,8));
+}
+function fx(x,d){ return (x===null||!isFinite(x)) ? "–" : x.toFixed(d); }
+
+/* ---------------- render ---------------- */
+function render(){
+  var r = compute();
+
+  /* hero bar */
+  var pcts = [r.a0*100, r.a1*100, r.a2*100];
+  var narrow = window.innerWidth < 640;
+  var textMin = narrow ? 15 : 7;   // % of bar width needed before a label fits
+  for(var i=0;i<3;i++){
+    var el = $("b"+i);
+    el.style.width = Math.max(pcts[i],0).toFixed(3)+"%";
+    el.querySelector(".pct").textContent = pcts[i] < 0.01 ? "<0.01%" : pcts[i].toFixed(pcts[i]<1?2:1)+"%";
+    el.style.display = pcts[i] < 0.25 ? "none" : "flex";
+    var hide = pcts[i] < textMin ? "none" : "";
+    el.querySelector(".pct").style.display = hide;
+    el.querySelector(".nm").style.display = hide;
+  }
+  $("kv0").textContent = sig(r.cCO2*MW.CO2*1000,4);
+  $("kv1").textContent = sig(r.cHCO3*MW.HCO3*1000,4);
+  $("kv2").textContent = sig(r.cCO3*MW.CO3*1000,4);
+
+  /* table */
+  var rows = [
+    ["CO₂(aq) + H₂CO₃","var(--co2)",r.a0,r.cCO2,MW.CO2],
+    ["HCO₃⁻","var(--hco3)",r.a1,r.cHCO3,MW.HCO3],
+    ["CO₃²⁻","var(--co3)",r.a2,r.cCO3,MW.CO3]
+  ];
+  var html = "";
+  rows.forEach(function(row){
+    html += "<tr><td><i class='sw' style='background:"+row[1]+"'></i>"+row[0]+"</td>"
+          + "<td>"+sig(row[2],4)+"</td>"
+          + "<td>"+sig(row[3],4)+"</td>"
+          + "<td>"+sig(row[3]*1000,4)+"</td>"
+          + "<td>"+sig(row[3]*row[4]*1000,4)+"</td>"
+          + "<td>"+sig(row[3]*MW.C*1000,4)+"</td></tr>";
+  });
+  html += "<tr style='font-weight:600'><td>Total inorganic carbon</td><td>1.000</td>"
+        + "<td>"+sig(r.CT,4)+"</td><td>"+sig(r.CT*1000,4)+"</td><td>—</td>"
+        + "<td>"+sig(r.CT*MW.C*1000,4)+"</td></tr>";
+  $("tbody").innerHTML = html;
+
+  /* stacked cards — shown instead of the table below 640px, so no sideways scroll */
+  var ch = "";
+  rows.forEach(function(row,ix){
+    ch += "<div class='speccard s"+ix+"'><h3><i class='sw' style='background:"+row[1]+"'></i>"+row[0]+"</h3><dl class='sp'>"
+        + "<dt>Fraction of TIC</dt><dd>"+sig(row[2],4)+"</dd>"
+        + "<dt>mmol/L</dt><dd>"+sig(row[3]*1000,4)+"</dd>"
+        + "<dt>mg/L as species</dt><dd>"+sig(row[3]*row[4]*1000,4)+"</dd>"
+        + "<dt>mg C/L</dt><dd>"+sig(row[3]*MW.C*1000,4)+"</dd>"
+        + "</dl></div>";
+  });
+  ch += "<div class='speccard st'><h3>Total inorganic carbon</h3><dl class='sp'>"
+      + "<dt>mmol/L</dt><dd>"+sig(r.CT*1000,4)+"</dd>"
+      + "<dt>mg C/L</dt><dd>"+sig(r.CT*MW.C*1000,4)+"</dd></dl></div>";
+  $("cards").innerHTML = ch;
+
+  /* derived */
+  $("d_alk").textContent  = sig(r.alk*1000,4)+" meq/L";
+  $("d_alkc").textContent = sig(r.alk*50043.5,4)+" mg/L";
+  $("d_talk").textContent = sig(r.talk*1000,4)+" meq/L";
+  $("d_pco2").textContent = sig(r.pCO2*1e6,4)+" µatm";
+  $("d_pco2r").textContent= sig(r.pCO2*1e6/430,3)+"×";
+  $("d_fco2").textContent = (r.a0*100).toFixed(2)+" %";
+  $("d_I").textContent    = sig(r.I,4)+" mol/L";
+  $("d_g").textContent    = fx(r.gCO2,3)+" · "+fx(r.gHCO3,3)+" · "+fx(r.gCO3,3);
+  $("d_pk").textContent   = fx(-Math.log(r.K1c)/Math.LN10,3)+" · "+fx(-Math.log(r.K2c)/Math.LN10,3);
+  $("d_pkw").textContent  = fx(-Math.log(r.K.Kw)/Math.LN10,3)+" · "+fx(-Math.log(r.K.KH)/Math.LN10,3);
+  $("d_sic").textContent  = r.SIc===null ? "no Ca entered" : (r.SIc>0?"+":"")+fx(r.SIc,2);
+  $("d_sia").textContent  = r.SIa===null ? "–" : ((r.SIa>0?"+":"")+fx(r.SIa,2)+" · "+(r.LSI>0?"+":"")+fx(r.LSI,2));
+
+  drawPlot(r);
+  drawFlags(r);
+  save();
+  window.__last = r;
+}
+
+/* ---------------- Bjerrum plot ---------------- */
+function drawPlot(r){
+  /* Geometry is chosen from the viewport. The SVG scales to its container, so a
+     smaller viewBox on a phone means proportionally larger axis type, not smaller. */
+  var narrow = window.innerWidth < 640;
+  var W = narrow ? 380 : 660, H = narrow ? 300 : 290;
+  var L = narrow ? 46 : 44, R = narrow ? 12 : 14, Tp = narrow ? 12 : 14, B = narrow ? 38 : 34;
+  var fAx  = narrow ? 13 : 11;      // tick labels
+  var fLab = narrow ? 13.5 : 11.5;  // axis titles
+  var yStep = narrow ? 0.5 : 0.25;
+  var xStep = narrow ? 2 : 1;
+  var lw = narrow ? 2.8 : 2.2;
+
+  var pw=W-L-R, ph=H-Tp-B;
+  var x = function(p){return L + (p-2)/(13-2)*pw;};
+  var y = function(f){return Tp + (1-f)*ph;};
+  var cols = ["var(--co2)","var(--hco3)","var(--co3)"];
+  var paths = [[],[],[]];
+  for(var i=0;i<=260;i++){
+    var p = 2 + (13-2)*i/260;
+    var f = fractions(p,r);
+    for(var k=0;k<3;k++) paths[k].push((i?"L":"M")+x(p).toFixed(2)+" "+y(f[k]).toFixed(2));
+  }
+  var s = '<svg class="bj" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Carbonate speciation fractions versus pH">';
+  for(var g=0; g<=1.0001; g+=yStep){
+    s += '<line x1="'+L+'" y1="'+y(g).toFixed(1)+'" x2="'+(W-R)+'" y2="'+y(g).toFixed(1)+'" stroke="var(--rule-soft)" stroke-width="1"/>';
+    s += '<text x="'+(L-6)+'" y="'+(y(g)+fAx*0.36).toFixed(1)+'" text-anchor="end" font-size="'+fAx+'" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">'+(narrow?g.toFixed(1):g.toFixed(2))+'</text>';
+  }
+  for(var p2=2; p2<=13; p2++){
+    s += '<line x1="'+x(p2).toFixed(1)+'" y1="'+Tp+'" x2="'+x(p2).toFixed(1)+'" y2="'+(Tp+ph)+'" stroke="var(--rule-soft)" stroke-width="1"/>';
+    if((p2-2) % xStep === 0)
+      s += '<text x="'+x(p2).toFixed(1)+'" y="'+(H-B+fAx+3)+'" text-anchor="middle" font-size="'+fAx+'" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">'+p2+'</text>';
+  }
+  s += '<text x="'+(L+pw/2)+'" y="'+(H-3)+'" text-anchor="middle" font-size="'+fLab+'" fill="var(--ink-2)">pH</text>';
+  s += '<text x="'+(narrow?9:12)+'" y="'+(Tp+ph/2)+'" text-anchor="middle" font-size="'+fLab+'" fill="var(--ink-2)" transform="rotate(-90 '+(narrow?9:12)+' '+(Tp+ph/2)+')">fraction of TIC</text>';
+
+  /* pK markers. The labels are dropped on a phone; the values are in Derived quantities. */
+  var pk1=-Math.log(r.K1c)/Math.LN10, pk2=-Math.log(r.K2c)/Math.LN10;
+  [[pk1,"pK\u2081\u2032"],[pk2,"pK\u2082\u2032"]].forEach(function(m){
+    if(m[0]>2 && m[0]<13){
+      s += '<line x1="'+x(m[0]).toFixed(1)+'" y1="'+Tp+'" x2="'+x(m[0]).toFixed(1)+'" y2="'+(Tp+ph)+'" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="2 4"/>';
+      if(!narrow)
+        s += '<text x="'+(x(m[0])+4).toFixed(1)+'" y="'+(Tp+12)+'" font-size="10.5" fill="var(--ink-3)">'+m[1]+' '+m[0].toFixed(2)+'</text>';
+    }
+  });
+
+  for(var k2=0;k2<3;k2++) s += '<path d="'+paths[k2].join(" ")+'" fill="none" stroke="'+cols[k2]+'" stroke-width="'+lw+'" stroke-linejoin="round"/>';
+
+  if(r.pH>2 && r.pH<13){
+    var xs = x(r.pH);
+    s += '<line x1="'+xs.toFixed(1)+'" y1="'+Tp+'" x2="'+xs.toFixed(1)+'" y2="'+(Tp+ph)+'" stroke="var(--ink)" stroke-width="'+(narrow?2:1.5)+'"/>';
+    var f=[r.a0,r.a1,r.a2];
+    for(var k3=0;k3<3;k3++)
+      s += '<circle cx="'+xs.toFixed(1)+'" cy="'+y(f[k3]).toFixed(1)+'" r="'+(narrow?5.5:4)+'" fill="'+cols[k3]+'" stroke="var(--panel)" stroke-width="1.8"/>';
+    var bw = narrow ? 68 : 54, bh = narrow ? 21 : 16;
+    var bx = Math.min(xs+6, W-R-bw);
+    s += '<rect x="'+bx.toFixed(1)+'" y="'+(Tp+ph-bh-3)+'" width="'+bw+'" height="'+bh+'" rx="2" fill="var(--panel)" stroke="var(--rule)"/>';
+    s += '<text x="'+(bx+bw/2).toFixed(1)+'" y="'+(Tp+ph-bh/2+fAx*0.36-2)+'" text-anchor="middle" font-size="'+fAx+'" fill="var(--ink)" font-family="IBM Plex Mono, monospace">pH '+r.pH.toFixed(2)+'</text>';
+  }
+  s += '</svg>';
+  $("plot").innerHTML = s;
+}
+
+/* ---------------- warnings ---------------- */
+function drawFlags(r){
+  var f = [];
+  if(r.model === "A" && r.I > 0.5)
+    f.push(["Ionic strength is "+r.I.toFixed(2)+" mol/L.","Davies and extended Debye–Hückel lose accuracy above about 0.5 mol/L. For a seawater-proportion matrix switch to the saline model; for an RO brine or a mixed-salt concentrate, treat the CO₃²⁻ fraction and the saturation index as indicative and confirm in a Pitzer code."]);
+  if(r.model === "B" && (r.S > 50 || r.S < 1))
+    f.push(["Salinity is "+r.S.toFixed(1)+" g/kg.","The saline constants are fitted for S = 1–50. Outside that range they are extrapolations."]);
+  if(r.model === "B" && $("phScale").value === "nbs")
+    f.push(["pH scale mismatch.","The saline constants expect pH on the seawater or total scale. An NBS-buffer-calibrated meter reads roughly 0.10–0.15 units higher at seawater salinity, which biases the CO₂ and CO₃²⁻ fractions."]);
+  if(r.model === "A" && $("phScale").value !== "nbs")
+    f.push(["pH scale mismatch.","The thermodynamic model treats pH as hydrogen ion activity, i.e. the NBS or free scale. A seawater-scale pH entered here will shift the split."]);
+  if(r.tC > 50 && r.model === "B")
+    f.push(["Temperature is above the fitted range.","The saline constants are valid to 50 °C. Plummer & Busenberg covers 0–90 °C."]);
+  if(r.tC > 90 || r.tC < 0)
+    f.push(["Temperature is outside 0–90 °C.","Both constant sets are extrapolated here."]);
+  if(r.cbe !== null && Math.abs(r.cbe) > 5)
+    f.push(["Charge balance error is "+r.cbe.toFixed(1)+" %.","At this level the ion analysis, the pH or the TIC is probably inconsistent. A positive error means unmeasured anions, a negative one unmeasured cations."]);
+  if(r.pCO2*1e6 > 20000 && r.a0 > 0.2)
+    f.push(["Equilibrium pCO₂ is "+(r.pCO2).toFixed(2)+" atm.","This water is far from air equilibrium and will degas on exposure. Confirm the sample was collected and analysed without headspace, otherwise the measured TIC is already low."]);
+  if(r.SIc !== null && r.SIc > 0.5)
+    f.push(["Calcite saturation index is +"+r.SIc.toFixed(2)+".","Calcium carbonate is strongly supersaturated. Expect scaling on heat-transfer and membrane surfaces without acid, antiscalant or softening."]);
+  if(r.CT <= 0) f.push(["No TIC entered.","Enter a total inorganic carbon value to get a split."]);
+
+  var html = "";
+  f.forEach(function(x){ html += '<div class="flag"><div><b>'+x[0]+'</b> '+x[1]+'</div></div>'; });
+  if(!html && r.CT > 0)
+    html = '<div class="flag ok"><div><b>Inputs are inside the validity envelope of the selected model.</b>'
+         + (r.cbe!==null ? ' Charge balance error '+r.cbe.toFixed(1)+' %.' : '') + '</div></div>';
+  $("flags").innerHTML = html;
+}
+
+/* ---------------- copy ---------------- */
+function copyResults(){
+  var r = window.__last; if(!r) return;
+  var L = [];
+  L.push("TIC SPECIATION");
+  L.push("pH "+r.pH.toFixed(2)+" ("+$("phScale").options[$("phScale").selectedIndex].text+")   T "+r.tC+" °C   I "+r.I.toFixed(4)+" mol/L");
+  L.push("Model: "+(r.model==="A"?"Plummer & Busenberg + "+r.gmodel:"Millero saline stoichiometric"));
+  L.push("TIC = "+(r.CT*MW.C*1000).toFixed(3)+" mg C/L = "+(r.CT*1000).toFixed(4)+" mmol/L");
+  L.push("");
+  L.push("species\tfraction\tmmol/L\tmg/L as species\tmg C/L");
+  L.push("CO2(aq)\t"+r.a0.toFixed(5)+"\t"+(r.cCO2*1000).toFixed(4)+"\t"+(r.cCO2*MW.CO2*1000).toFixed(3)+"\t"+(r.cCO2*MW.C*1000).toFixed(3));
+  L.push("HCO3-\t"+r.a1.toFixed(5)+"\t"+(r.cHCO3*1000).toFixed(4)+"\t"+(r.cHCO3*MW.HCO3*1000).toFixed(3)+"\t"+(r.cHCO3*MW.C*1000).toFixed(3));
+  L.push("CO3 2-\t"+r.a2.toFixed(5)+"\t"+(r.cCO3*1000).toFixed(4)+"\t"+(r.cCO3*MW.CO3*1000).toFixed(3)+"\t"+(r.cCO3*MW.C*1000).toFixed(3));
+  L.push("");
+  L.push("Carbonate alkalinity\t"+(r.alk*1000).toFixed(4)+" meq/L\t"+(r.alk*50043.5).toFixed(1)+" mg/L as CaCO3");
+  L.push("Equilibrium pCO2\t"+(r.pCO2*1e6).toFixed(0)+" uatm");
+  L.push("pK1' / pK2'\t"+(-Math.log(r.K1c)/Math.LN10).toFixed(3)+" / "+(-Math.log(r.K2c)/Math.LN10).toFixed(3));
+  L.push("gamma CO2/HCO3/CO3\t"+r.gCO2.toFixed(4)+" / "+r.gHCO3.toFixed(4)+" / "+r.gCO3.toFixed(4));
+  if(r.SIc!==null) L.push("SI calcite / aragonite\t"+r.SIc.toFixed(2)+" / "+r.SIa.toFixed(2));
+  if(r.cbe!==null) L.push("Charge balance error\t"+r.cbe.toFixed(2)+" %");
+  var txt = L.join("\n");
+  var btn = $("copyBtn");
+  function done(){ btn.textContent="Copied"; setTimeout(function(){btn.textContent="Copy results";},1400); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+  function fallback(){
+    var ta=document.createElement("textarea"); ta.value=txt;
+    ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+    ta.select(); try{document.execCommand("copy"); done();}catch(e){btn.textContent="Copy failed";}
+    document.body.removeChild(ta);
+  }
+}
+
+/* ---------------- persistence ---------------- */
+var FIELDS = ["tic","ticUnit","ph","phScale","temp","rho","iNa","iK","iCa","iMg","iNH4",
+              "iCl","iSO4","iNO3","tds","ec","sal","model","gmodel","ks"];
+function save(){
+  try{
+    var o = {matrix:state.matrix};
+    FIELDS.forEach(function(f){ o[f] = $(f).value; });
+    localStorage.setItem("ticSpec.v1", JSON.stringify(o));
+  }catch(e){}
+}
+function load(){
+  try{
+    var raw = localStorage.getItem("ticSpec.v1"); if(!raw) return;
+    var o = JSON.parse(raw); if(!o || typeof o !== "object") return;
+    FIELDS.forEach(function(f){ if(typeof o[f] === "string") $(f).value = o[f]; });
+    if(o.matrix) setMatrix(o.matrix);
+  }catch(e){}
+}
+
+/* ---------------- wiring ---------------- */
+function setMatrix(m){
+  state.matrix = m;
+  Array.prototype.forEach.call($("matrixSeg").children, function(b){
+    b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false");
+  });
+  $("mIons").hidden = m !== "ions";
+  $("mTds").hidden  = m !== "tds";
+  $("mEc").hidden   = m !== "ec";
+  $("mSal").hidden  = m !== "sal";
+  if(m === "sal") $("model").value = "B";
+}
+
+Array.prototype.forEach.call($("matrixSeg").children, function(b){
+  b.addEventListener("click", function(){ setMatrix(b.dataset.m); render(); });
+});
+FIELDS.forEach(function(f){
+  $(f).addEventListener("input", function(){
+    if(f === "ph"){ $("phSlide").value = $(f).value; }
+    render();
+  });
+  $(f).addEventListener("change", render);
+});
+$("phSlide").addEventListener("input", function(){
+  $("ph").value = parseFloat($("phSlide").value).toFixed(2);
+  render();
+});
+$("copyBtn").addEventListener("click", copyResults);
+$("resetBtn").addEventListener("click", function(){
+  try{ localStorage.removeItem("ticSpec.v1"); }catch(e){}
+  location.reload();
+});
+$("themebtn").addEventListener("click", function(){
+  var cur = document.documentElement.getAttribute("data-theme");
+  var dark = cur ? cur === "dark"
+                 : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  render();
+});
+
+/* Rotating a phone changes the breakpoint, so re-render the plot and bar labels. */
+var rt;
+function onResize(){
+  clearTimeout(rt);
+  rt = setTimeout(function(){ if(window.__last) render(); }, 150);
+}
+window.addEventListener("resize", onResize);
+window.addEventListener("orientationchange", onResize);
+
+load();
+$("phSlide").value = $("ph").value;
+render();
+})();
+</script>
+<script>
+/* Offline support. Registration is best-effort: if it fails the page still works. */
+if("serviceWorker" in navigator && location.protocol === "https:"){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
