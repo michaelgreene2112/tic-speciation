@@ -199,6 +199,23 @@ input[type=range]::-moz-range-thumb{
   border:3px solid var(--panel); box-shadow:0 1px 3px rgba(0,0,0,.28);
 }
 
+/* ---------- explore mode ---------- */
+.explorebar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin-top:10px; padding:9px 11px; border-radius:0 2px 2px 0;
+  border-left:3px solid var(--accent); background:var(--panel-2);
+  font-size:12.5px; color:var(--ink-2); line-height:1.45;
+}
+.explorebar b{color:var(--ink); font-weight:600}
+.explorebar .grow{flex:1 1 180px; min-width:0}
+.btn.sm{padding:7px 12px; font-size:12.5px; min-height:0; white-space:nowrap}
+.tag{
+  display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px;
+  font-size:11.5px; font-weight:500; background:var(--panel-2);
+  color:var(--accent); border:1px solid var(--rule);
+  vertical-align:middle; letter-spacing:.01em;
+}
+
 /* ---------- species cards (phone) ---------- */
 .speccards{display:none}
 .speccard{border-left:3px solid var(--rule); padding:9px 0 10px 12px; margin-bottom:11px}
@@ -352,7 +369,7 @@ input[type=range]::-moz-range-thumb{
 
         <div id="mIons">
           <div class="ions">
-            <div><label class="lb" for="iNa">Na⁺ mg/L</label><input type="number" inputmode="decimal" id="iNa" value="180" step="any" min="0"></div>
+            <div><label class="lb" for="iNa">Na⁺ mg/L</label><input type="number" inputmode="decimal" id="iNa" value="278" step="any" min="0"></div>
             <div><label class="lb" for="iK">K⁺ mg/L</label><input type="number" inputmode="decimal" id="iK" value="12" step="any" min="0"></div>
             <div><label class="lb" for="iCa">Ca²⁺ mg/L</label><input type="number" inputmode="decimal" id="iCa" value="85" step="any" min="0"></div>
             <div><label class="lb" for="iMg">Mg²⁺ mg/L</label><input type="number" inputmode="decimal" id="iMg" value="26" step="any" min="0"></div>
@@ -408,7 +425,7 @@ input[type=range]::-moz-range-thumb{
   <!-- ================= RESULTS ================= -->
   <div>
     <section class="panel">
-      <h2>Speciation at the sample pH</h2>
+      <h2 id="specHead">Speciation at the sample pH</h2>
       <div class="hero">
         <div class="bar" id="bar">
           <div class="bseg0" id="b0" style="width:33%"><span class="pct">–</span><span class="nm">CO₂(aq)</span></div>
@@ -446,8 +463,12 @@ input[type=range]::-moz-range-thumb{
         <span style="color:var(--ink-3)">Vertical line = sample pH</span>
       </div>
       <div class="slider">
-        <label class="lb" for="phSlide">Drag to explore pH (updates the sample pH)</label>
+        <label class="lb" for="phSlide">Explore pH — the measured value above is kept</label>
         <input type="range" id="phSlide" min="3" max="12" step="0.01" value="7.80">
+        <div class="explorebar" id="exploreBar" hidden>
+          <span class="grow" id="exploreTxt"></span>
+          <button class="btn sec sm" id="backBtn" type="button">Return to measured pH</button>
+        </div>
       </div>
     </section>
 
@@ -549,7 +570,13 @@ var MW = {C:12.011, CO2:44.009, HCO3:61.017, CO3:60.009, CaCO3:100.087,
 var TJ = {H:[9.0,0], HCO3:[5.4,0], CO3:[5.4,0], Ca:[5.0,0.165], OH:[3.5,0]};
 
 var $ = function(id){return document.getElementById(id);};
-var state = {matrix:"ions"};
+var state = {matrix:"ions", explorePH:null};
+
+/* The pH field holds the MEASURED value and is never overwritten by the slider.
+   explorePH is a transient what-if overlay; null means we are on the measured value. */
+function measuredPH(){ return num("ph",7); }
+function currentPH(){ return state.explorePH === null ? measuredPH() : state.explorePH; }
+function exploring(){ return state.explorePH !== null; }
 
 /* ---------------- thermodynamic constants ---------------- */
 function pbConstants(T){
@@ -637,7 +664,7 @@ function ticToMolar(){
 function compute(phOverride){
   var out = {flags:[]};
   var tC = num("temp",25), T = tC + 273.15;
-  var pH = (phOverride === undefined) ? num("ph",7) : phOverride;
+  var pH = (phOverride === undefined) ? currentPH() : phOverride;
   var CT = ticToMolar();
   var rho = num("rho",1) || 1;
   var model = $("model").value;
@@ -730,11 +757,19 @@ function fractions(pH,r){
 }
 
 /* ---------------- formatting ---------------- */
+var SUP = {"0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3","4":"\u2074","5":"\u2075",
+           "6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079","-":"\u207b","+":""};
+function supNum(s){
+  return s.split("").map(function(c){ return SUP[c] !== undefined ? SUP[c] : c; }).join("");
+}
 function sig(x,n){
   if(x === null || !isFinite(x)) return "–";
   if(x === 0) return "0";
   var ax = Math.abs(x);
-  if(ax >= 1e5 || ax < 1e-4) return x.toExponential(n-1).replace("e","×10^").replace("+","");
+  if(ax >= 1e5 || ax < 1e-4){
+    var e = x.toExponential(n-1).split("e");
+    return e[0] + "\u00d710" + supNum(e[1]);
+  }
   var digits = Math.max(0, n - 1 - Math.floor(Math.log(ax)/Math.LN10));
   return x.toFixed(Math.min(digits,8));
 }
@@ -800,7 +835,8 @@ function render(){
   $("d_alk").textContent  = sig(r.alk*1000,4)+" meq/L";
   $("d_alkc").textContent = sig(r.alk*50043.5,4)+" mg/L";
   $("d_talk").textContent = sig(r.talk*1000,4)+" meq/L";
-  $("d_pco2").textContent = sig(r.pCO2*1e6,4)+" µatm";
+  $("d_pco2").textContent = (r.pCO2 >= 0.1)
+    ? sig(r.pCO2,4)+" atm" : sig(r.pCO2*1e6,4)+" \u00b5atm";
   $("d_pco2r").textContent= sig(r.pCO2*1e6/430,3)+"×";
   $("d_fco2").textContent = (r.a0*100).toFixed(2)+" %";
   $("d_I").textContent    = sig(r.I,4)+" mol/L";
@@ -810,8 +846,18 @@ function render(){
   $("d_sic").textContent  = r.SIc===null ? "no Ca entered" : (r.SIc>0?"+":"")+fx(r.SIc,2);
   $("d_sia").textContent  = r.SIa===null ? "–" : ((r.SIa>0?"+":"")+fx(r.SIa,2)+" · "+(r.LSI>0?"+":"")+fx(r.LSI,2));
 
+  var ex = exploring();
+  $("specHead").innerHTML = ex
+    ? 'Speciation at pH ' + r.pH.toFixed(2) + ' <span class="tag">what-if</span>'
+    : 'Speciation at the sample pH';
+  $("exploreBar").hidden = !ex;
+  if(ex){
+    $("exploreTxt").innerHTML = 'Showing <b>pH ' + r.pH.toFixed(2) + '</b>. Measured pH '
+      + measuredPH().toFixed(2) + ' is unchanged; sample-consistency checks are paused.';
+  }
+
   drawPlot(r);
-  drawFlags(r);
+  drawFlags(r, ex);
   save();
   window.__last = r;
 }
@@ -822,7 +868,7 @@ function drawPlot(r){
      smaller viewBox on a phone means proportionally larger axis type, not smaller. */
   var narrow = window.innerWidth < 640;
   var W = narrow ? 380 : 660, H = narrow ? 300 : 290;
-  var L = narrow ? 46 : 44, R = narrow ? 12 : 14, Tp = narrow ? 12 : 14, B = narrow ? 38 : 34;
+  var L = narrow ? 52 : 44, R = narrow ? 12 : 14, Tp = narrow ? 12 : 14, B = narrow ? 38 : 34;
   var fAx  = narrow ? 13 : 11;      // tick labels
   var fLab = narrow ? 13.5 : 11.5;  // axis titles
   var yStep = narrow ? 0.5 : 0.25;
@@ -850,7 +896,7 @@ function drawPlot(r){
       s += '<text x="'+x(p2).toFixed(1)+'" y="'+(H-B+fAx+3)+'" text-anchor="middle" font-size="'+fAx+'" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">'+p2+'</text>';
   }
   s += '<text x="'+(L+pw/2)+'" y="'+(H-3)+'" text-anchor="middle" font-size="'+fLab+'" fill="var(--ink-2)">pH</text>';
-  s += '<text x="'+(narrow?9:12)+'" y="'+(Tp+ph/2)+'" text-anchor="middle" font-size="'+fLab+'" fill="var(--ink-2)" transform="rotate(-90 '+(narrow?9:12)+' '+(Tp+ph/2)+')">fraction of TIC</text>';
+  s += '<text x="'+(narrow?14:12)+'" y="'+(Tp+ph/2)+'" text-anchor="middle" font-size="'+fLab+'" fill="var(--ink-2)" transform="rotate(-90 '+(narrow?14:12)+' '+(Tp+ph/2)+')">fraction of TIC</text>';
 
   /* pK markers. The labels are dropped on a phone; the values are in Derived quantities. */
   var pk1=-Math.log(r.K1c)/Math.LN10, pk2=-Math.log(r.K2c)/Math.LN10;
@@ -880,7 +926,7 @@ function drawPlot(r){
 }
 
 /* ---------------- warnings ---------------- */
-function drawFlags(r){
+function drawFlags(r, ex){
   var f = [];
   if(r.model === "A" && r.I > 0.5)
     f.push(["Ionic strength is "+r.I.toFixed(2)+" mol/L.","Davies and extended Debye–Hückel lose accuracy above about 0.5 mol/L. For a seawater-proportion matrix switch to the saline model; for an RO brine or a mixed-salt concentrate, treat the CO₃²⁻ fraction and the saturation index as indicative and confirm in a Pitzer code."]);
@@ -894,9 +940,11 @@ function drawFlags(r){
     f.push(["Temperature is above the fitted range.","The saline constants are valid to 50 °C. Plummer & Busenberg covers 0–90 °C."]);
   if(r.tC > 90 || r.tC < 0)
     f.push(["Temperature is outside 0–90 °C.","Both constant sets are extrapolated here."]);
-  if(r.cbe !== null && Math.abs(r.cbe) > 5)
+  /* Charge balance and the degassing note are QA tests on the LAB DATA. At a what-if pH
+     they would be answering a question nobody asked, so they are withheld. */
+  if(!ex && r.cbe !== null && Math.abs(r.cbe) > 5)
     f.push(["Charge balance error is "+r.cbe.toFixed(1)+" %.","At this level the ion analysis, the pH or the TIC is probably inconsistent. A positive error means unmeasured anions, a negative one unmeasured cations."]);
-  if(r.pCO2*1e6 > 20000 && r.a0 > 0.2)
+  if(!ex && r.pCO2*1e6 > 20000 && r.a0 > 0.2)
     f.push(["Equilibrium pCO₂ is "+(r.pCO2).toFixed(2)+" atm.","This water is far from air equilibrium and will degas on exposure. Confirm the sample was collected and analysed without headspace, otherwise the measured TIC is already low."]);
   if(r.SIc !== null && r.SIc > 0.5)
     f.push(["Calcite saturation index is +"+r.SIc.toFixed(2)+".","Calcium carbonate is strongly supersaturated. Expect scaling on heat-transfer and membrane surfaces without acid, antiscalant or softening."]);
@@ -904,7 +952,11 @@ function drawFlags(r){
 
   var html = "";
   f.forEach(function(x){ html += '<div class="flag"><div><b>'+x[0]+'</b> '+x[1]+'</div></div>'; });
-  if(!html && r.CT > 0)
+  if(ex && r.CT > 0)
+    html += '<div class="flag ok"><div><b>What-if pH.</b> Charge balance and sampling checks '
+          + 'apply to the measured pH and are paused. Everything above is the chemistry that '
+          + 'would result if this water were driven to pH '+r.pH.toFixed(2)+'.</div></div>';
+  else if(!html && r.CT > 0)
     html = '<div class="flag ok"><div><b>Inputs are inside the validity envelope of the selected model.</b>'
          + (r.cbe!==null ? ' Charge balance error '+r.cbe.toFixed(1)+' %.' : '') + '</div></div>';
   $("flags").innerHTML = html;
@@ -915,6 +967,9 @@ function copyResults(){
   var r = window.__last; if(!r) return;
   var L = [];
   L.push("TIC SPECIATION");
+  if(exploring()){
+    L.push("*** WHAT-IF pH "+r.pH.toFixed(2)+" - NOT the measured value ("+measuredPH().toFixed(2)+") ***");
+  }
   L.push("pH "+r.pH.toFixed(2)+" ("+$("phScale").options[$("phScale").selectedIndex].text+")   T "+r.tC+" °C   I "+r.I.toFixed(4)+" mol/L");
   L.push("Model: "+(r.model==="A"?"Plummer & Busenberg + "+r.gmodel:"Millero saline stoichiometric"));
   L.push("TIC = "+(r.CT*MW.C*1000).toFixed(3)+" mg C/L = "+(r.CT*1000).toFixed(4)+" mmol/L");
@@ -929,7 +984,7 @@ function copyResults(){
   L.push("pK1' / pK2'\t"+(-Math.log(r.K1c)/Math.LN10).toFixed(3)+" / "+(-Math.log(r.K2c)/Math.LN10).toFixed(3));
   L.push("gamma CO2/HCO3/CO3\t"+r.gCO2.toFixed(4)+" / "+r.gHCO3.toFixed(4)+" / "+r.gCO3.toFixed(4));
   if(r.SIc!==null) L.push("SI calcite / aragonite\t"+r.SIc.toFixed(2)+" / "+r.SIa.toFixed(2));
-  if(r.cbe!==null) L.push("Charge balance error\t"+r.cbe.toFixed(2)+" %");
+  if(r.cbe!==null && !exploring()) L.push("Charge balance error\t"+r.cbe.toFixed(2)+" %");
   var txt = L.join("\n");
   var btn = $("copyBtn");
   function done(){ btn.textContent="Copied"; setTimeout(function(){btn.textContent="Copy results";},1400); }
@@ -981,14 +1036,28 @@ Array.prototype.forEach.call($("matrixSeg").children, function(b){
 });
 FIELDS.forEach(function(f){
   $(f).addEventListener("input", function(){
-    if(f === "ph"){ $("phSlide").value = $(f).value; }
+    if(f === "ph"){ syncSlider(); state.explorePH = null; }   // typing a measurement exits what-if
     render();
   });
   $(f).addEventListener("change", render);
 });
+
+function syncSlider(){
+  var v = measuredPH();
+  $("phSlide").value = Math.min(12, Math.max(3, isFinite(v) ? v : 7));
+}
+
 $("phSlide").addEventListener("input", function(){
-  $("ph").value = parseFloat($("phSlide").value).toFixed(2);
+  var v = parseFloat($("phSlide").value);
+  /* Back on the measured value (within one slider step) means we are no longer exploring. */
+  state.explorePH = Math.abs(v - measuredPH()) < 0.005 ? null : v;
   render();
+});
+$("backBtn").addEventListener("click", function(){
+  state.explorePH = null;
+  syncSlider();
+  render();
+  $("phSlide").focus();
 });
 $("copyBtn").addEventListener("click", copyResults);
 $("resetBtn").addEventListener("click", function(){
@@ -1013,7 +1082,8 @@ window.addEventListener("resize", onResize);
 window.addEventListener("orientationchange", onResize);
 
 load();
-$("phSlide").value = $("ph").value;
+state.explorePH = null;   // never restore a what-if value from storage
+syncSlider();
 render();
 })();
 </script>
