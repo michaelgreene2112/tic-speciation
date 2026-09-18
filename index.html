@@ -199,6 +199,9 @@ input[type=range]::-moz-range-thumb{
   border:3px solid var(--panel); box-shadow:0 1px 3px rgba(0,0,0,.28);
 }
 
+.wkgroup{margin-top:13px; padding-top:12px; border-top:1px solid var(--rule-soft)}
+.sublabel{font-size:12px; color:var(--ink-3); margin:0 0 10px; line-height:1.4}
+
 /* ---------- explore mode ---------- */
 .explorebar{
   display:flex; flex-wrap:wrap; align-items:center; gap:10px;
@@ -354,6 +357,18 @@ input[type=range]::-moz-range-thumb{
             <input type="number" inputmode="decimal" id="rho" value="1.000" step="0.001" min="0.9" max="1.3">
           </div>
         </div>
+        <div class="pair" style="margin-bottom:0">
+          <div>
+            <label class="lb" for="toc">TOC (mg C/L)</label>
+            <input type="number" inputmode="decimal" id="toc" value="" step="any" min="0" placeholder="optional">
+          </div>
+          <div>
+            <label class="lb" for="tc">TC (mg C/L)</label>
+            <input type="number" inputmode="decimal" id="tc" value="" step="any" min="0" placeholder="optional">
+          </div>
+        </div>
+        <p class="hint" id="tcCheck" style="margin-top:6px"></p>
+        <p class="hint">Off the same analyser run. Used only as a diagnostic — organic carbon is never added to the calculated alkalinity.</p>
       </div>
     </section>
 
@@ -371,20 +386,17 @@ input[type=range]::-moz-range-thumb{
           <div class="ions">
             <div><label class="lb" for="iNa">Na⁺ mg/L</label><input type="number" inputmode="decimal" id="iNa" value="278" step="any" min="0"></div>
             <div><label class="lb" for="iK">K⁺ mg/L</label><input type="number" inputmode="decimal" id="iK" value="12" step="any" min="0"></div>
-            <div><label class="lb" for="iCa">Ca²⁺ mg/L</label><input type="number" inputmode="decimal" id="iCa" value="85" step="any" min="0"></div>
             <div><label class="lb" for="iMg">Mg²⁺ mg/L</label><input type="number" inputmode="decimal" id="iMg" value="26" step="any" min="0"></div>
-            <div><label class="lb" for="iNH4">NH₄⁺ mg/L</label><input type="number" inputmode="decimal" id="iNH4" value="0" step="any" min="0"></div>
             <div><label class="lb" for="iCl">Cl⁻ mg/L</label><input type="number" inputmode="decimal" id="iCl" value="240" step="any" min="0"></div>
             <div><label class="lb" for="iSO4">SO₄²⁻ mg/L</label><input type="number" inputmode="decimal" id="iSO4" value="110" step="any" min="0"></div>
             <div><label class="lb" for="iNO3">NO₃⁻ mg/L</label><input type="number" inputmode="decimal" id="iNO3" value="0" step="any" min="0"></div>
           </div>
-          <p class="hint">Carbonate species are added to ionic strength and charge balance automatically, by iteration.</p>
         </div>
 
         <div id="mTds" hidden>
           <label class="lb" for="tds">Total dissolved solids (mg/L)</label>
           <input type="number" inputmode="decimal" id="tds" value="850" step="any" min="0">
-          <p class="hint">I ≈ 2.5 × 10⁻⁵ × TDS. Ca is taken from the ion panel for scaling indices.</p>
+          <p class="hint">I ≈ 2.5 × 10⁻⁵ × TDS.</p>
         </div>
 
         <div id="mEc" hidden>
@@ -397,6 +409,21 @@ input[type=range]::-moz-range-thumb{
           <label class="lb" for="sal">Practical salinity (g/kg)</label>
           <input type="number" inputmode="decimal" id="sal" value="35" step="any" min="0" max="120">
           <p class="hint">I = 19.924 S / (1000 − 1.005 S), mol/kg. Use with the saline model.</p>
+        </div>
+
+        <div class="wkgroup">
+          <p class="sublabel">Calcium and weak acids — these feed alkalinity, charge balance and the scaling indices whichever method you chose above, so they stay visible.</p>
+          <div class="ions">
+            <div><label class="lb" for="iCa">Ca²⁺ mg/L</label><input type="number" inputmode="decimal" id="iCa" value="85" step="any" min="0"></div>
+            <div><label class="lb" for="iNH4">NH₄⁺ mg/L</label><input type="number" inputmode="decimal" id="iNH4" value="0" step="any" min="0"></div>
+            <div><label class="lb" for="iPO4">Phosphate mg/L</label><input type="number" inputmode="decimal" id="iPO4" value="0" step="any" min="0"></div>
+            <div><label class="lb" for="pBasis">Phosphate basis</label>
+              <select id="pBasis"><option value="P">as P</option><option value="PO4">as PO₄</option></select>
+            </div>
+            <div><label class="lb" for="iB">Boron as B mg/L</label><input type="number" inputmode="decimal" id="iB" value="0" step="any" min="0"></div>
+            <div><label class="lb" for="iSiO2">Silica as SiO₂ mg/L</label><input type="number" inputmode="decimal" id="iSiO2" value="0" step="any" min="0"></div>
+          </div>
+          <p class="hint">Carbonate, phosphate, ammonia, borate and silicate are speciated at the sample pH and fed into ionic strength and charge balance by iteration.</p>
         </div>
 
         <details class="adv">
@@ -473,19 +500,47 @@ input[type=range]::-moz-range-thumb{
     </section>
 
     <section class="panel">
+      <h2>Alkalinity</h2>
+      <div class="body">
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Contribution</th><th>meq/L</th><th>mg/L as CaCO₃</th><th>% of total</th></tr></thead>
+            <tbody id="alkbody"></tbody>
+          </table>
+        </div>
+        <div class="speccards" id="alkcards"></div>
+        <p class="hint">Proton condition with Dickson zero levels: H₂CO₃*, H₂PO₄⁻, NH₄⁺, B(OH)₃, H₄SiO₄, H₂O. Sulfide and organic acids are not included. Rows for species you have not entered are hidden.</p>
+        <div class="pair" style="margin-top:12px; margin-bottom:0">
+          <div>
+            <label class="lb" for="alkMeas">Titrated alkalinity (mg/L as CaCO₃)</label>
+            <input type="number" inputmode="decimal" id="alkMeas" value="" step="any" min="0" placeholder="optional">
+          </div>
+          <div>
+            <label class="lb">Agreement with calculated</label>
+            <div id="alkCheck" class="num" style="padding:8px 0 0; font-size:14px; color:var(--ink-2)">enter a value to compare</div>
+          </div>
+        </div>
+        <div id="orgBox" hidden class="wkgroup">
+          <p class="sublabel" style="margin-bottom:8px"><b style="color:var(--ink)">Organic carbon diagnostic</b> — the gap is not predicted from TOC, it is divided by it. The result is a charge density you can judge.</p>
+          <div class="dl"><dt>Unexplained gap</dt><dd id="o_gap">–</dd></div>
+          <div class="dl"><dt>Implied organic charge density</dt><dd id="o_dens">–</dd></div>
+          <p class="hint" id="o_note" style="margin-top:9px"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
       <h2>Derived quantities</h2>
       <div class="body">
         <div class="grid2">
           <div>
-            <div class="dl"><dt>Carbonate alkalinity</dt><dd id="d_alk">–</dd></div>
-            <div class="dl"><dt>Carbonate alk. as CaCO₃</dt><dd id="d_alkc">–</dd></div>
-            <div class="dl"><dt>Total alkalinity (carbonate + water)</dt><dd id="d_talk">–</dd></div>
             <div class="dl"><dt>Equilibrium pCO₂</dt><dd id="d_pco2">–</dd></div>
             <div class="dl"><dt>pCO₂ vs. air (≈430 ppm)</dt><dd id="d_pco2r">–</dd></div>
             <div class="dl"><dt>Free CO₂ / TIC</dt><dd id="d_fco2">–</dd></div>
+            <div class="dl"><dt>Ionic strength</dt><dd id="d_I">–</dd></div>
+            <div class="dl"><dt>NH₃ fraction of total N</dt><dd id="d_nh3">–</dd></div>
           </div>
           <div>
-            <div class="dl"><dt>Ionic strength</dt><dd id="d_I">–</dd></div>
             <div class="dl"><dt>γ CO₂(aq) · γ HCO₃⁻ · γ CO₃²⁻</dt><dd id="d_g">–</dd></div>
             <div class="dl"><dt>pK₁′ · pK₂′ (conditional)</dt><dd id="d_pk">–</dd></div>
             <div class="dl"><dt>pK<sub>w</sub> · pK<sub>H</sub></dt><dd id="d_pkw">–</dd></div>
@@ -565,9 +620,45 @@ K₂′ = K₂ · γ(HCO₃⁻) / γ(CO₃²⁻)</div>
 /* ---------------- constants ---------------- */
 var MW = {C:12.011, CO2:44.009, HCO3:61.017, CO3:60.009, CaCO3:100.087,
           Na:22.990, K:39.098, Ca:40.078, Mg:24.305, NH4:18.039,
-          Cl:35.453, SO4:96.06, NO3:62.004};
+          Cl:35.453, SO4:96.06, NO3:62.004,
+          P:30.974, PO4:94.971, N:14.007, NH3:17.031, B:10.811, SiO2:60.084};
 /* Truesdell-Jones / WATEQ ion-size and b parameters */
-var TJ = {H:[9.0,0], HCO3:[5.4,0], CO3:[5.4,0], Ca:[5.0,0.165], OH:[3.5,0]};
+var TJ = {H:[9.0,0], HCO3:[5.4,0], CO3:[5.4,0], Ca:[5.0,0.165], OH:[3.5,0],
+          H2PO4:[4.5,0], HPO4:[4.0,0], PO4:[4.0,0], NH4:[2.5,0],
+          BOH4:[4.0,0], H3SiO4:[4.0,0], H2SiO4:[4.0,0]};
+
+/* Boric acid, Dickson (1990), total pH scale, valid S = 0-45.
+   Checked: pKB* = 8.5975 at S=35 / 25 C (published 8.597), and the S=0 limit gives
+   9.2364, matching the pure-water value 9.237 — so one expression serves both models. */
+function boricK(T,S){
+  var s = Math.sqrt(Math.max(S,0)), lnT = Math.log(T);
+  var ln = (-8966.90 - 2890.53*s - 77.942*S + 1.728*S*s - 0.0996*S*S)/T
+         + 148.0248 + 137.1942*s + 1.62142*S
+         + (-24.4344 - 25.085*s - 0.2474*S)*lnT
+         + 0.053105*s*T;
+  return Math.exp(ln);
+}
+
+/* Non-carbonate weak acids.
+   Phosphoric acid: 25 C values (2.148 / 7.198 / 12.35) carried to temperature by
+   van't Hoff with dH = -7.9, +4.2, +14.7 kJ/mol. The first two dissociations have
+   near-zero enthalpy so their T-dependence is weak; pK3 is the least certain.
+   Ammonium: Bates & Pinching, pKa = 0.09018 + 2729.92/T (9.246 at 25 C). */
+function weakAcids(T){
+  var c = 1/(2.302585093*8.3145);          // 1/(2.303 R), mol/J
+  function vh(pK25, dH){ return pK25 + dH*c*(1/T - 1/298.15); }
+  return {
+    Kp1: Math.pow(10, -vh(2.148, -7900)),
+    Kp2: Math.pow(10, -vh(7.198,  4200)),
+    Kp3: Math.pow(10, -vh(12.35, 14700)),
+    Kn : Math.pow(10, -(0.09018 + 2729.92/T)),
+    /* Silicic acid: pKa1 9.84 at 25 C by van't Hoff with dH = +25 kJ/mol. pKa2 is held
+       at 13.2 with no temperature correction — it is soft, so the silicate term is
+       indicative above about pH 11. */
+    Ks1: Math.pow(10, -vh(9.84, 25000)),
+    Ks2: Math.pow(10, -13.2)
+  };
+}
 
 var $ = function(id){return document.getElementById(id);};
 var state = {matrix:"ions", explorePH:null};
@@ -645,8 +736,12 @@ function num(id, dflt){
 }
 
 function readIons(){
+  var pv = num("iPO4");
+  /* stored internally as mg/L of P regardless of the basis the user typed */
+  var pAsP = ($("pBasis").value === "PO4") ? pv*MW.P/MW.PO4 : pv;
   return {Na:num("iNa"), K:num("iK"), Ca:num("iCa"), Mg:num("iMg"), NH4:num("iNH4"),
-          Cl:num("iCl"), SO4:num("iSO4"), NO3:num("iNO3")};
+          Cl:num("iCl"), SO4:num("iSO4"), NO3:num("iNO3"), P:pAsP, PO4raw:pv,
+          B:num("iB"), SiO2:num("iSiO2")};
 }
 
 function ticToMolar(){
@@ -672,6 +767,7 @@ function compute(phOverride){
   var ks = num("ks",0.11);
   var ions = readIons();
   var mat = state.matrix;
+  var toc = num("toc");
 
   /* --- ionic strength and salinity --- */
   var I, S, tds;
@@ -680,9 +776,12 @@ function compute(phOverride){
     ionMol = {Na:ions.Na/MW.Na/1000, K:ions.K/MW.K/1000, Ca:ions.Ca/MW.Ca/1000,
               Mg:ions.Mg/MW.Mg/1000, NH4:ions.NH4/MW.NH4/1000, Cl:ions.Cl/MW.Cl/1000,
               SO4:ions.SO4/MW.SO4/1000, NO3:ions.NO3/MW.NO3/1000};
-    I = 0.5*(ionMol.Na + ionMol.K + 4*ionMol.Ca + 4*ionMol.Mg + ionMol.NH4
+    /* NH4/NH3 and the phosphate ladder are pH-dependent, so they are added inside
+       the iteration rather than to the fixed base. */
+    I = 0.5*(ionMol.Na + ionMol.K + 4*ionMol.Ca + 4*ionMol.Mg
            + ionMol.Cl + 4*ionMol.SO4 + ionMol.NO3);
-    tds = ions.Na+ions.K+ions.Ca+ions.Mg+ions.NH4+ions.Cl+ions.SO4+ions.NO3;
+    tds = ions.Na+ions.K+ions.Ca+ions.Mg+ions.NH4+ions.Cl+ions.SO4+ions.NO3
+        + ions.P*MW.PO4/MW.P;
     S = tds/1000;
   } else if(mat === "tds"){
     tds = num("tds"); I = 2.5e-5*tds; S = tds/1000;
@@ -693,9 +792,15 @@ function compute(phOverride){
   }
   var Ibase = I;
 
-  /* --- speciation, iterated so carbonate feeds back into I --- */
-  var K, dp = debyeParams(tC);
+  /* --- speciation, iterated so carbonate, phosphate and ammonia feed back into I --- */
+  var K, dp = debyeParams(tC), WA = weakAcids(T);
   var a0=0,a1=0,a2=0, gCO2=1,gHCO3=1,gCO3=1,gCa=1, K1c, K2c;
+  var PT = ions.P/MW.P/1000;          // mol/L total phosphate
+  var NT = ions.NH4/MW.NH4/1000;      // mol/L total ammoniacal N
+  var BT = ions.B/MW.B/1000;          // mol/L total boron
+  var ST = ions.SiO2/MW.SiO2/1000;    // mol/L total dissolved silica
+  var fB=0, s0=1, s1=0, s2=0;         // borate and silicate fractions
+  var q0=0,q1=0,q2=0,q3=0, n3=0,n4=1; // phosphate and ammonia fractions
   var h = Math.pow(10,-pH);
 
   for(var it=0; it<12; it++){
@@ -714,8 +819,45 @@ function compute(phOverride){
     }
     var d = 1 + K1c/h + K1c*K2c/(h*h);
     a0 = 1/d; a1 = (K1c/h)/d; a2 = (K1c*K2c/(h*h))/d;
-    var Inew = Ibase + 0.5*(CT*a1 + 4*CT*a2);
-    if(mat !== "ions" || Math.abs(Inew - I) < 1e-9){ I = Inew; break; }
+
+    /* Phosphate and ammonia. In model A these are made conditional on the same
+       activity-scale pH as carbonate; in model B activity coefficients are unity,
+       which mixes pH scales — flagged in the warnings. */
+    var g1 = (model === "A") ? gamma(1,I,dp,gmodel,"H2PO4") : 1;
+    var g2 = (model === "A") ? gamma(2,I,dp,gmodel,"HPO4")  : 1;
+    var g3 = (model === "A") ? gamma(3,I,dp,gmodel,"PO4")   : 1;
+    var gN = (model === "A") ? gamma(1,I,dp,gmodel,"NH4")   : 1;
+    var kp1 = WA.Kp1/g1, kp2 = WA.Kp2*g1/g2, kp3 = WA.Kp3*g2/g3;
+    var dq = 1 + kp1/h + kp1*kp2/(h*h) + kp1*kp2*kp3/(h*h*h);
+    q0 = 1/dq;                          // H3PO4
+    q1 = (kp1/h)/dq;                    // H2PO4-
+    q2 = (kp1*kp2/(h*h))/dq;            // HPO4 2-
+    q3 = (kp1*kp2*kp3/(h*h*h))/dq;      // PO4 3-
+    var kn = WA.Kn*gN;
+    n3 = kn/(h + kn);                   // NH3 (neutral)
+    n4 = h/(h + kn);                    // NH4+
+
+    /* Borate. Model A uses the S=0 limit of Dickson with an activity correction;
+       model B uses the seawater constant directly, on its own pH scale. */
+    var gB4 = (model === "A") ? gamma(1,I,dp,gmodel,"BOH4") : 1;
+    var kb  = (model === "A") ? boricK(T,0)/gB4 : boricK(T,S);
+    fB = kb/(h + kb);                   // B(OH)4-
+
+    /* Silicate. pKa2 is soft, so the H2SiO4(2-) term is indicative above pH ~11. */
+    var gS1 = (model === "A") ? gamma(1,I,dp,gmodel,"H3SiO4") : 1;
+    var gS2 = (model === "A") ? gamma(2,I,dp,gmodel,"H2SiO4") : 1;
+    var ks1 = WA.Ks1/gS1, ks2 = WA.Ks2*gS1/gS2;
+    var ds  = 1 + ks1/h + ks1*ks2/(h*h);
+    s0 = 1/ds;                          // H4SiO4
+    s1 = (ks1/h)/ds;                    // H3SiO4-
+    s2 = (ks1*ks2/(h*h))/ds;            // H2SiO4 2-
+
+    var Inew = Ibase + 0.5*(CT*a1 + 4*CT*a2
+                          + PT*q1 + 4*PT*q2 + 9*PT*q3
+                          + NT*n4
+                          + BT*fB
+                          + ST*s1 + 4*ST*s2);
+    if(mat !== "ions" || Math.abs(Inew - I) < 1e-10){ I = Inew; break; }
     I = Inew;
   }
 
@@ -725,8 +867,15 @@ function compute(phOverride){
   var cH  = (model === "A") ? h/gamma(1,I,dp,gmodel,"H") : h;
 
   /* --- derived --- */
-  var alk = cHCO3 + 2*cCO3;                      // eq/L, carbonate only
-  var talk = alk + cOH - cH;
+  /* Alkalinity, eq/L. Zero levels follow Dickson: H2CO3*, H2PO4-, NH4+, H2O.
+     Phosphate therefore contributes HPO4(2-) + 2 PO4(3-) - H3PO4. */
+  var alk    = cHCO3 + 2*cCO3;
+  var alkP   = PT*(q2 + 2*q3 - q0);
+  var alkN   = NT*n3;
+  var alkB   = BT*fB;                    // zero level B(OH)3
+  var alkSi  = ST*(s1 + 2*s2);           // zero level H4SiO4
+  var alkW   = cOH - cH;
+  var talk   = alk + alkP + alkN + alkB + alkSi + alkW;
   var pCO2 = cCO2/(rho)/K.KH;                    // atm  (KH in mol/(kg·atm))
   var Ca = ions.Ca/MW.Ca/1000;
   var IAP = (model === "A") ? (gCa*Ca)*(gCO3*cCO3) : (Ca/rho)*(cCO3/rho);
@@ -737,15 +886,20 @@ function compute(phOverride){
   /* --- charge balance --- */
   var cbe = null;
   if(mat === "ions"){
-    var cat = ionMol.Na + ionMol.K + 2*ionMol.Ca + 2*ionMol.Mg + ionMol.NH4 + cH;
-    var an  = ionMol.Cl + 2*ionMol.SO4 + ionMol.NO3 + cHCO3 + 2*cCO3 + cOH;
+    var cat = ionMol.Na + ionMol.K + 2*ionMol.Ca + 2*ionMol.Mg + NT*n4 + cH;
+    var an  = ionMol.Cl + 2*ionMol.SO4 + ionMol.NO3 + cHCO3 + 2*cCO3 + cOH
+            + PT*(q1 + 2*q2 + 3*q3)
+            + BT*fB + ST*(s1 + 2*s2);
     if(cat + an > 0) cbe = 100*(cat - an)/(cat + an);
   }
 
   return {tC:tC,T:T,pH:pH,CT:CT,I:I,S:S,tds:tds,model:model,
           a0:a0,a1:a1,a2:a2,cCO2:cCO2,cHCO3:cHCO3,cCO3:cCO3,
           gCO2:gCO2,gHCO3:gHCO3,gCO3:gCO3,K1c:K1c,K2c:K2c,K:K,
-          cOH:cOH,cH:cH,alk:alk,talk:talk,pCO2:pCO2,
+          cOH:cOH,cH:cH,alk:alk,alkP:alkP,alkN:alkN,alkB:alkB,alkSi:alkSi,
+          alkW:alkW,talk:talk,pCO2:pCO2,
+          PT:PT,NT:NT,BT:BT,ST:ST,q0:q0,q1:q1,q2:q2,q3:q3,n3:n3,n4:n4,
+          fB:fB,s0:s0,s1:s1,s2:s2,toc:toc,
           SIc:SIc,SIa:SIa,LSI:LSI,cbe:cbe,Ca:Ca,rho:rho,gmodel:gmodel};
 }
 
@@ -832,9 +986,92 @@ function render(){
   $("cards").innerHTML = ch;
 
   /* derived */
-  $("d_alk").textContent  = sig(r.alk*1000,4)+" meq/L";
-  $("d_alkc").textContent = sig(r.alk*50043.5,4)+" mg/L";
-  $("d_talk").textContent = sig(r.talk*1000,4)+" meq/L";
+  /* ---- alkalinity breakdown ---- */
+  var CACO3 = 50043.5;     // mg/L as CaCO3 per eq/L
+  var arows = [
+    ["Carbonate (HCO₃⁻ + 2CO₃²⁻)", r.alk, false],
+    ["Phosphate (HPO₄²⁻ + 2PO₄³⁻ − H₃PO₄)", r.alkP, true],
+    ["Ammonia (NH₃)", r.alkN, true],
+    ["Borate (B(OH)₄⁻)", r.alkB, true],
+    ["Silicate (H₃SiO₄⁻ + 2H₂SiO₄²⁻)", r.alkSi, true],
+    ["Water (OH⁻ − H⁺)", r.alkW, false]
+  ];
+  var ah = "", ac = "";
+  arows.forEach(function(row){
+    var pct = (r.talk !== 0) ? 100*row[1]/r.talk : 0;
+    if(row[2] && row[1] === 0) return;                // hide unused contributions
+    ah += "<tr><td>"+row[0]+"</td><td>"+sig(row[1]*1000,4)+"</td><td>"
+        + sig(row[1]*CACO3,4)+"</td><td>"+pct.toFixed(2)+"</td></tr>";
+    ac += "<div class='speccard'><h3>"+row[0]+"</h3><dl class='sp'>"
+        + "<dt>meq/L</dt><dd>"+sig(row[1]*1000,4)+"</dd>"
+        + "<dt>mg/L as CaCO₃</dt><dd>"+sig(row[1]*CACO3,4)+"</dd>"
+        + "<dt>% of total</dt><dd>"+pct.toFixed(2)+"</dd></dl></div>";
+  });
+  ah += "<tr style='font-weight:600'><td>Total alkalinity</td><td>"+sig(r.talk*1000,4)
+      + "</td><td>"+sig(r.talk*CACO3,4)+"</td><td>100.00</td></tr>";
+  ac += "<div class='speccard st'><h3>Total alkalinity</h3><dl class='sp'>"
+      + "<dt>meq/L</dt><dd>"+sig(r.talk*1000,4)+"</dd>"
+      + "<dt>mg/L as CaCO₃</dt><dd>"+sig(r.talk*CACO3,4)+"</dd></dl></div>";
+  $("alkbody").innerHTML = ah;
+  $("alkcards").innerHTML = ac;
+
+  /* ---- titration cross-check ---- */
+  var mv = $("alkMeas").value.trim(), calc = r.talk*CACO3, el = $("alkCheck");
+  if(mv === "" || !isFinite(parseFloat(mv))){
+    el.textContent = "enter a value to compare";
+    el.style.color = "var(--ink-2)";
+  } else {
+    var meas = parseFloat(mv), diff = meas - calc;
+    var pct = calc !== 0 ? 100*diff/calc : 0;
+    el.textContent = (diff>=0?"+":"") + sig(diff,3) + " mg/L  (" + (pct>=0?"+":"") + pct.toFixed(1) + " %)";
+    el.style.color = Math.abs(pct) <= 5 ? "var(--ok)"
+                   : (Math.abs(pct) <= 10 ? "var(--ink)" : "var(--warn)");
+  }
+
+  /* ---- organic carbon diagnostics ----
+     TOC is carbon mass, alkalinity is charge, and the ratio between them spans 0 to about
+     42 meq/g C depending on what the organics are. So no organic term is ever added to the
+     total; instead the unexplained gap is divided by TOC to give a charge density the user
+     can sanity-check against known compound classes. */
+  var tocV = parseFloat($("toc").value), tcV = parseFloat($("tc").value);
+  var icMgC = r.CT*MW.C*1000;
+
+  /* TC = IC + TOC closure check */
+  var tcEl = $("tcCheck");
+  if(isFinite(tcV) && tcV > 0){
+    var impliedTOC = tcV - icMgC;
+    if(isFinite(tocV) && tocV > 0){
+      var res = impliedTOC - tocV;
+      var relp = tocV !== 0 ? 100*res/tocV : 0;
+      tcEl.innerHTML = "TC − IC = " + sig(impliedTOC,4) + " mg C/L against TOC "
+        + sig(tocV,4) + " — closure " + (res>=0?"+":"") + sig(res,3) + " mg C/L ("
+        + (relp>=0?"+":"") + relp.toFixed(1) + " %).";
+      tcEl.style.color = Math.abs(relp) <= 5 ? "var(--ok)" : "var(--warn)";
+    } else {
+      tcEl.innerHTML = "TC − IC = " + sig(impliedTOC,4) + " mg C/L implied organic carbon.";
+      tcEl.style.color = "var(--ink-3)";
+    }
+  } else { tcEl.textContent = ""; }
+
+  var measA = parseFloat($("alkMeas").value);
+  var ob = $("orgBox");
+  if(isFinite(tocV) && tocV > 0 && isFinite(measA)){
+    ob.hidden = false;
+    var gapEq = (measA - calc)/CACO3;            // eq/L
+    var dens  = gapEq*1e6/tocV;                  // meq per gram of organic carbon
+    $("o_gap").textContent  = (gapEq>=0?"+":"") + sig(gapEq*CACO3,3) + " mg/L as CaCO₃  ("
+                            + (gapEq>=0?"+":"") + sig(gapEq*1000,3) + " meq/L)";
+    $("o_dens").textContent = sig(dens,3) + " meq/g C";
+    var v = organicVerdict(dens);
+    $("o_note").innerHTML = v[0];
+    $("o_note").style.color = v[1];
+    $("o_dens").style.color = v[1];
+  } else {
+    ob.hidden = true;
+  }
+
+  $("d_nh3").textContent = r.NT > 0
+    ? (r.n3*100).toFixed(2)+" % ("+sig(r.NT*r.n3*MW.N*1000,3)+" mg/L as N)" : "no NH₄⁺ entered";
   $("d_pco2").textContent = (r.pCO2 >= 0.1)
     ? sig(r.pCO2,4)+" atm" : sig(r.pCO2*1e6,4)+" \u00b5atm";
   $("d_pco2r").textContent= sig(r.pCO2*1e6/430,3)+"×";
@@ -860,6 +1097,20 @@ function render(){
   drawFlags(r, ex);
   save();
   window.__last = r;
+}
+
+/* Interpretation bands for implied organic charge density, meq per gram organic carbon.
+   Reference points: alcohols and sugars 0; humic and fulvic NOM roughly 8-14; short-chain
+   carboxylic acids about 42 at full deprotonation (one carboxyl per two carbons), though
+   titration to a pH 4.5 endpoint normally registers well below that. */
+function organicVerdict(d){
+  if(d < 0) return ["<b>Negative gap.</b> The calculated alkalinity exceeds the titrated value, so organic acids cannot account for it — they can only add. Check the titration endpoint, an over-stated TIC or ion input, or whether the sample changed between the two analyses.", "var(--warn)"];
+  if(d < 3) return ["<b>Near zero.</b> Your organics are carrying almost no charge — alcohols and sugars, most likely — so the gap is something else: a degassed sample, a bad TIC, or sulfide.", "var(--warn)"];
+  if(d < 8) return ["<b>Low.</b> Consistent with mostly uncharged organics plus a small charged fraction. Organics explain part of the gap at most; look to TIC and sampling for the remainder.", "var(--ink)"];
+  if(d <= 15) return ["<b>Around 10 — NOM-like humic and fulvic material,</b> the usual case in surface water and reuse streams. Plausible: the gap is most likely genuine organic alkalinity.", "var(--ok)"];
+  if(d <= 30) return ["<b>Above the humic range.</b> Points to short-chain carboxylic acids — volatile fatty acids, lactic, malic — rather than NOM. Plausible in a fermentation, winery or digestate stream.", "var(--ok)"];
+  if(d <= 42) return ["<b>Near 40 — short-chain carboxylic acids dominate,</b> at roughly one carboxyl per two carbons; acetate, tartrate and citrate all sit here. Note that titration to a pH 4.5 endpoint normally registers well under the full value, so a measured 40 is already at the physical limit.", "var(--ink)"];
+  return ["<b>Above 42 meq/g C.</b> No organic carbon carries that much charge, so the gap is not organic at all — look at the ion analysis, the titration endpoint, or an unmeasured inorganic weak acid such as sulfide.", "var(--warn)"];
 }
 
 /* ---------------- Bjerrum plot ---------------- */
@@ -948,6 +1199,12 @@ function drawFlags(r, ex){
     f.push(["Equilibrium pCO₂ is "+(r.pCO2).toFixed(2)+" atm.","This water is far from air equilibrium and will degas on exposure. Confirm the sample was collected and analysed without headspace, otherwise the measured TIC is already low."]);
   if(r.SIc !== null && r.SIc > 0.5)
     f.push(["Calcite saturation index is +"+r.SIc.toFixed(2)+".","Calcium carbonate is strongly supersaturated. Expect scaling on heat-transfer and membrane surfaces without acid, antiscalant or softening."]);
+  if(r.model === "B" && (r.PT > 0 || r.NT > 0 || r.ST > 0))
+    f.push(["Some non-carbonate alkalinity uses freshwater constants.","Borate is fine — it uses Dickson's seawater constant on the same scale as the carbonate terms. Phosphate, ammonia and silicate are computed from pure-water pK values on the activity (NBS) scale, so those alkalinity terms are approximate here. The carbonate split is unaffected."]);
+  if(r.toc > 20 && r.SIc !== null)
+    f.push(["Organic matter will complex calcium.","At "+sig(r.toc,3)+" mg C/L, a real fraction of the calcium is bound to organic ligands and is not available to precipitate. Free Ca²⁺ is lower than the total entered, so the calcite saturation index above is optimistic. No correction is applied — binding constants are matrix-specific."]);
+  if(r.ST > 0 && r.pH > 11)
+    f.push(["Silicate above pH 11.","The second silicic acid dissociation (pKa2 ≈ 13.2) carries no temperature correction and is poorly constrained, so the silicate alkalinity term is indicative rather than quantitative in this range."]);
   if(r.CT <= 0) f.push(["No TIC entered.","Enter a total inorganic carbon value to get a split."]);
 
   var html = "";
@@ -979,12 +1236,29 @@ function copyResults(){
   L.push("HCO3-\t"+r.a1.toFixed(5)+"\t"+(r.cHCO3*1000).toFixed(4)+"\t"+(r.cHCO3*MW.HCO3*1000).toFixed(3)+"\t"+(r.cHCO3*MW.C*1000).toFixed(3));
   L.push("CO3 2-\t"+r.a2.toFixed(5)+"\t"+(r.cCO3*1000).toFixed(4)+"\t"+(r.cCO3*MW.CO3*1000).toFixed(3)+"\t"+(r.cCO3*MW.C*1000).toFixed(3));
   L.push("");
-  L.push("Carbonate alkalinity\t"+(r.alk*1000).toFixed(4)+" meq/L\t"+(r.alk*50043.5).toFixed(1)+" mg/L as CaCO3");
+  L.push("ALKALINITY\tmeq/L\tmg/L as CaCO3");
+  L.push("Carbonate\t"+(r.alk*1000).toFixed(4)+"\t"+(r.alk*50043.5).toFixed(1));
+  if(r.alkP!==0) L.push("Phosphate\t"+(r.alkP*1000).toFixed(4)+"\t"+(r.alkP*50043.5).toFixed(1));
+  if(r.alkN!==0) L.push("Ammonia\t"+(r.alkN*1000).toFixed(4)+"\t"+(r.alkN*50043.5).toFixed(1));
+  if(r.alkB!==0) L.push("Borate\t"+(r.alkB*1000).toFixed(4)+"\t"+(r.alkB*50043.5).toFixed(1));
+  if(r.alkSi!==0) L.push("Silicate\t"+(r.alkSi*1000).toFixed(4)+"\t"+(r.alkSi*50043.5).toFixed(1));
+  L.push("Water\t"+(r.alkW*1000).toFixed(4)+"\t"+(r.alkW*50043.5).toFixed(1));
+  L.push("TOTAL\t"+(r.talk*1000).toFixed(4)+"\t"+(r.talk*50043.5).toFixed(1));
+  L.push("");
   L.push("Equilibrium pCO2\t"+(r.pCO2*1e6).toFixed(0)+" uatm");
   L.push("pK1' / pK2'\t"+(-Math.log(r.K1c)/Math.LN10).toFixed(3)+" / "+(-Math.log(r.K2c)/Math.LN10).toFixed(3));
   L.push("gamma CO2/HCO3/CO3\t"+r.gCO2.toFixed(4)+" / "+r.gHCO3.toFixed(4)+" / "+r.gCO3.toFixed(4));
   if(r.SIc!==null) L.push("SI calcite / aragonite\t"+r.SIc.toFixed(2)+" / "+r.SIa.toFixed(2));
   if(r.cbe!==null && !exploring()) L.push("Charge balance error\t"+r.cbe.toFixed(2)+" %");
+  if(r.toc > 0){
+    L.push("TOC\t"+r.toc.toFixed(2)+" mg C/L");
+    var ma = parseFloat($("alkMeas").value);
+    if(isFinite(ma)){
+      var ge = (ma - r.talk*50043.5)/50043.5;
+      L.push("Unexplained alkalinity gap\t"+(ge*50043.5).toFixed(1)+" mg/L as CaCO3");
+      L.push("Implied organic charge density\t"+(ge*1e6/r.toc).toFixed(2)+" meq/g C  (diagnostic only; not in the total)");
+    }
+  }
   var txt = L.join("\n");
   var btn = $("copyBtn");
   function done(){ btn.textContent="Copied"; setTimeout(function(){btn.textContent="Copy results";},1400); }
@@ -1001,7 +1275,9 @@ function copyResults(){
 
 /* ---------------- persistence ---------------- */
 var FIELDS = ["tic","ticUnit","ph","phScale","temp","rho","iNa","iK","iCa","iMg","iNH4",
-              "iCl","iSO4","iNO3","tds","ec","sal","model","gmodel","ks"];
+              "iCl","iSO4","iNO3","iPO4","pBasis","iB","iSiO2","alkMeas","toc","tc",
+              "tds","ec","sal",
+              "model","gmodel","ks"];
 function save(){
   try{
     var o = {matrix:state.matrix};
